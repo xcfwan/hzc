@@ -13,6 +13,25 @@ class MonitorService:
         self.tg = Tg(settings.telegram_bot_token, settings.telegram_chat_id)
         self.last_snapshot = []
 
+    async def meta(self):
+        types = await self.client.list_server_types()
+        locations = await self.client.list_locations()
+        snapshots = await self.client.list_snapshots()
+        return {
+            "server_types": [
+                {
+                    "name": t.get("name"),
+                    "cores": t.get("cores"),
+                    "memory": t.get("memory"),
+                    "disk": t.get("disk"),
+                    "prices": t.get("prices", []),
+                }
+                for t in types
+            ],
+            "locations": [{"name": l.get("name"), "city": l.get("city")} for l in locations],
+            "snapshots": [{"id": i.get("id"), "name": i.get("description") or i.get("name")} for i in snapshots],
+        }
+
     async def collect(self):
         servers = await self.client.list_servers()
         rows = []
@@ -72,6 +91,16 @@ class MonitorService:
         await self.client.delete_server(server_id)
         await self.tg.send(f"✅ Rotated {src['name']} -> {new_srv['server']['name']}")
         return {"ok": True, "new_server": new_srv}
+
+    async def create_snapshot_manual(self, server_id: int, description: str | None = None):
+        if not description:
+            description = f"manual-snap-{server_id}-{dt.datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+        return await self.client.create_snapshot(server_id, description)
+
+    async def create_server_manual(self, name: str, server_type: str, location: str, image):
+        created = await self.client.create_server(name=name, server_type=server_type, location=location, image=image)
+        await self.tg.send(f"🆕 New server created: {created.get('server', {}).get('name', name)}")
+        return created
 
 
 monitor = MonitorService()

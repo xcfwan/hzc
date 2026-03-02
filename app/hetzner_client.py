@@ -14,26 +14,43 @@ class HetznerClient:
             r.raise_for_status()
             return r.json().get("servers", [])
 
+    async def list_server_types(self):
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.get(f"{BASE}/server_types", headers=self.headers)
+            r.raise_for_status()
+            return r.json().get("server_types", [])
+
+    async def list_locations(self):
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.get(f"{BASE}/locations", headers=self.headers)
+            r.raise_for_status()
+            return r.json().get("locations", [])
+
+    async def list_snapshots(self):
+        params = {"type": "snapshot", "bound_to": "null"}
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.get(f"{BASE}/images", headers=self.headers, params=params)
+            r.raise_for_status()
+            return r.json().get("images", [])
+
     async def get_outbound_bytes_month(self, server_id: int) -> int:
         now = dt.datetime.utcnow()
-        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat() + "Z"
-        end = now.isoformat() + "Z"
+        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
+        end = now.replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
         params = {
             "type": "network",
             "start": start,
             "end": end,
-            "step": "1d",
+            "step": "3600",
         }
         async with httpx.AsyncClient(timeout=30) as c:
             r = await c.get(f"{BASE}/servers/{server_id}/metrics", headers=self.headers, params=params)
             r.raise_for_status()
             data = r.json()
 
-        # Hetzner metrics -> traffic may be in 'time_series' with tx bytes.
         series = data.get("metrics", {}).get("time_series", {}).get("network.0.tx", [])
         total = 0
         for point in series:
-            # format [timestamp, "value"]
             if len(point) > 1 and point[1] is not None:
                 total += int(float(point[1]))
         return total
@@ -58,6 +75,18 @@ class HetznerClient:
             "image": image_id,
             "location": src_server.get("datacenter", {}).get("location", {}).get("name"),
             "labels": {**(src_server.get("labels") or {}), "rotated_from": str(src_server["id"])},
+        }
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.post(f"{BASE}/servers", headers=self.headers, json=payload)
+            r.raise_for_status()
+            return r.json()
+
+    async def create_server(self, *, name: str, server_type: str, location: str, image):
+        payload = {
+            "name": name,
+            "server_type": server_type,
+            "location": location,
+            "image": image,
         }
         async with httpx.AsyncClient(timeout=30) as c:
             r = await c.post(f"{BASE}/servers", headers=self.headers, json=payload)

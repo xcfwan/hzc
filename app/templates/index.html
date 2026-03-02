@@ -6,14 +6,16 @@
   <title>Hetzner Traffic Guard</title>
   <link rel="stylesheet" href="/static/style.css" />
 </head>
-<body>
+<body data-theme="dark">
   <header class="topbar">
     <div>
       <h1>Hetzner Traffic Guard</h1>
       <p class="sub">服务器流量监控 · 安全模式优先</p>
     </div>
     <div class="actions">
+      <button id="themeBtn" onclick="toggleTheme()">☀️ 浅色</button>
       <input id="kw" placeholder="搜索服务器名/IP" />
+      <button onclick="openCreateModal()">+ 创建服务器</button>
       <button onclick="loadData()">刷新</button>
     </div>
   </header>
@@ -31,6 +33,22 @@
       <tbody></tbody>
     </table>
   </section>
+
+  <div id="createModal" class="modal hidden">
+    <div class="modal-card">
+      <h3>创建新服务器</h3>
+      <div class="grid">
+        <label>名称<input id="c_name" placeholder="my-server" /></label>
+        <label>机房<select id="c_location"></select></label>
+        <label>型号<select id="c_type"></select><small id="typePrice"></small></label>
+        <label>镜像/快照<select id="c_image"></select></label>
+      </div>
+      <div class="modal-actions">
+        <button onclick="submitCreate()">创建</button>
+        <button class="ghost" onclick="closeCreateModal()">取消</button>
+      </div>
+    </div>
+  </div>
 
   <script src="/static/app.js"></script>
 </body>
