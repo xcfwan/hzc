@@ -1,5 +1,6 @@
 function byId(x){return document.getElementById(x)}
 let META={server_types:[],locations:[],snapshots:[]}
+let CURRENT_SERVERS=[]
 
 function toggleTheme(){
   const b=document.body
@@ -53,6 +54,13 @@ function monthlyPriceForType(t, loc){
   return Number(pick?.price_monthly?.gross || 999999)
 }
 
+function stockBadge(t, loc){
+  const hasLoc = (t.prices||[]).some(p=>p.location===loc)
+  if(!hasLoc) return '缺货'
+  if((CURRENT_SERVERS||[]).length>=3) return '紧张'
+  return '有货'
+}
+
 function renderTypeOptions(){
   const loc=byId('c_location').value
   const cores=Number(byId('f_cores').value || 0)
@@ -66,7 +74,8 @@ function renderTypeOptions(){
   sel.innerHTML=arr.map(t=>{
     const p=monthlyPriceForType(t,loc)
     const ps=Number.isFinite(p)?`€${p.toFixed(2)}/月`:'价格未知'
-    return `<option value="${t.name}">${t.name} · ${t.cores}C/${t.memory}GB/${t.disk}GB · ${ps}</option>`
+    const st=stockBadge(t,loc)
+    return `<option value="${t.name}">[${st}] ${t.name} · ${t.cores}C/${t.memory}GB/${t.disk}GB · ${ps}</option>`
   }).join('')
   showTypePrice()
 }
@@ -96,11 +105,17 @@ function showTypePrice(){
   const t=(META.server_types||[]).find(x=>x.name===v)
   const loc=byId('c_location').value
   let txt=''
+  let est=''
   if(t){
     const p=t.prices?.find(x=>x.location===loc) || t.prices?.[0]
-    if(p?.price_monthly?.gross) txt=`约 €${p.price_monthly.gross} /月（${p.location}）`
+    if(p?.price_monthly?.gross){
+      txt=`约 €${p.price_monthly.gross} /月（${p.location}）`
+      est=`创建前费用预估：月费 €${p.price_monthly.gross}（不含超额流量）`
+    }
+    byId('typeStock').textContent=`库存状态：${stockBadge(t, loc)}`
   }
   byId('typePrice').textContent=txt
+  byId('costEst').textContent=est
 }
 
 function preset(kind){
@@ -114,6 +129,7 @@ async function loadData(){
   const kw=(byId('kw')?.value||'').trim().toLowerCase()
   const res=await fetch('/api/servers')
   const data=await res.json()
+  CURRENT_SERVERS=data
   renderCards(data)
   const filtered=data.filter(r=>!kw || String(r.name).toLowerCase().includes(kw) || String(r.ip||'').toLowerCase().includes(kw))
   const tb=document.querySelector('#tb tbody')
@@ -135,6 +151,12 @@ async function snapshot(id){
 
 function openCreateModal(){ byId('createModal').classList.remove('hidden') }
 function closeCreateModal(){ byId('createModal').classList.add('hidden') }
+
+async function refreshInventory(){
+  await loadMeta()
+  await loadData()
+  alert('库存与型号信息已刷新')
+}
 
 async function submitCreate(){
   const body={

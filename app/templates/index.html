@@ -16,6 +16,7 @@
       <button id="themeBtn" onclick="toggleTheme()">☀️ 浅色</button>
       <input id="kw" placeholder="搜索服务器名/IP" />
       <button onclick="openCreateModal()">+ 创建服务器</button>
+      <button onclick="refreshInventory()">刷新库存</button>
       <button onclick="loadData()">刷新</button>
     </div>
   </header>
@@ -42,8 +43,8 @@
         <label>机房<select id="c_location"></select></label>
         <label>最少CPU核心<select id="f_cores"><option value="">不限</option><option>2</option><option>4</option><option>8</option><option>16</option></select></label>
         <label>最少内存GB<select id="f_mem"><option value="">不限</option><option>2</option><option>4</option><option>8</option><option>16</option><option>32</option></select></label>
-        <label>型号<select id="c_type"></select><small id="typePrice"></small></label>
-        <label>镜像/快照<select id="c_image"></select></label>
+        <label>型号<select id="c_type"></select><small id="typePrice"></small><small id="typeStock"></small></label>
+        <label>镜像/快照<select id="c_image"></select><small id="costEst"></small></label>
       </div>
       <div class="modal-actions" style="margin-top:8px">
         <button class="ghost" onclick="preset('basic')">入门推荐</button>
