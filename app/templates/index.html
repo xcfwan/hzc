@@ -7,12 +7,31 @@
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-  <h2>Hetzner 流量监控</h2>
-  <button onclick="loadData()">刷新</button>
-  <table id="tb">
-    <thead><tr><th>ID</th><th>名称</th><th>IP</th><th>状态</th><th>已用(TB)</th><th>限额</th><th>占比</th><th>操作</th></tr></thead>
-    <tbody></tbody>
-  </table>
+  <header class="topbar">
+    <div>
+      <h1>Hetzner Traffic Guard</h1>
+      <p class="sub">服务器流量监控 · 安全模式优先</p>
+    </div>
+    <div class="actions">
+      <input id="kw" placeholder="搜索服务器名/IP" />
+      <button onclick="loadData()">刷新</button>
+    </div>
+  </header>
+
+  <section class="cards" id="cards"></section>
+
+  <section class="panel">
+    <div class="panel-title">服务器列表</div>
+    <table id="tb">
+      <thead>
+      <tr>
+        <th>ID</th><th>名称</th><th>IP</th><th>状态</th><th>已用(TB)</th><th>限额</th><th>占比</th><th>操作</th>
+      </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
   <script src="/static/app.js"></script>
 </body>
 </html>
