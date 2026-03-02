@@ -40,8 +40,15 @@
       <div class="grid">
         <label>名称<input id="c_name" placeholder="my-server" /></label>
         <label>机房<select id="c_location"></select></label>
+        <label>最少CPU核心<select id="f_cores"><option value="">不限</option><option>2</option><option>4</option><option>8</option><option>16</option></select></label>
+        <label>最少内存GB<select id="f_mem"><option value="">不限</option><option>2</option><option>4</option><option>8</option><option>16</option><option>32</option></select></label>
         <label>型号<select id="c_type"></select><small id="typePrice"></small></label>
         <label>镜像/快照<select id="c_image"></select></label>
+      </div>
+      <div class="modal-actions" style="margin-top:8px">
+        <button class="ghost" onclick="preset('basic')">入门推荐</button>
+        <button class="ghost" onclick="preset('balanced')">均衡推荐</button>
+        <button class="ghost" onclick="preset('pro')">高配推荐</button>
       </div>
       <div class="modal-actions">
         <button onclick="submitCreate()">创建</button>

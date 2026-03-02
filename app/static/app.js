@@ -46,30 +46,68 @@ function rowHtml(r){
   </tr>`
 }
 
+function monthlyPriceForType(t, loc){
+  if(!t?.prices?.length) return Number.POSITIVE_INFINITY
+  const exact=t.prices.find(p=>p.location===loc)
+  const pick=exact || t.prices[0]
+  return Number(pick?.price_monthly?.gross || 999999)
+}
+
+function renderTypeOptions(){
+  const loc=byId('c_location').value
+  const cores=Number(byId('f_cores').value || 0)
+  const mem=Number(byId('f_mem').value || 0)
+  const arr=[...META.server_types]
+    .filter(t=>!cores || (t.cores||0)>=cores)
+    .filter(t=>!mem || (t.memory||0)>=mem)
+    .sort((a,b)=>monthlyPriceForType(a,loc)-monthlyPriceForType(b,loc))
+
+  const sel=byId('c_type')
+  sel.innerHTML=arr.map(t=>{
+    const p=monthlyPriceForType(t,loc)
+    const ps=Number.isFinite(p)?`€${p.toFixed(2)}/月`:'价格未知'
+    return `<option value="${t.name}">${t.name} · ${t.cores}C/${t.memory}GB/${t.disk}GB · ${ps}</option>`
+  }).join('')
+  showTypePrice()
+}
+
 async function loadMeta(){
   const res=await fetch('/api/meta')
   META=await res.json()
-  const typeSel=byId('c_type')
-  typeSel.innerHTML=META.server_types.map(t=>`<option value="${t.name}">${t.name} · ${t.cores}C/${t.memory}GB/${t.disk}GB</option>`).join('')
+
   const locSel=byId('c_location')
   locSel.innerHTML=META.locations.map(l=>`<option value="${l.name}">${l.name} (${l.city||''})</option>`).join('')
+
   const imgSel=byId('c_image')
   const basic=[`<option value="debian-12">debian-12 (官方镜像)</option>`]
   const snaps=META.snapshots.map(s=>`<option value="${s.id}">snapshot#${s.id} - ${s.name||''}</option>`)
   imgSel.innerHTML=basic.concat(snaps).join('')
-  typeSel.addEventListener('change',showTypePrice)
-  showTypePrice()
+
+  byId('c_location').addEventListener('change',()=>{renderTypeOptions(); showTypePrice()})
+  byId('c_type').addEventListener('change',showTypePrice)
+  byId('f_cores').addEventListener('change',renderTypeOptions)
+  byId('f_mem').addEventListener('change',renderTypeOptions)
+
+  renderTypeOptions()
 }
 
 function showTypePrice(){
   const v=byId('c_type').value
   const t=(META.server_types||[]).find(x=>x.name===v)
+  const loc=byId('c_location').value
   let txt=''
-  if(t && t.prices && t.prices.length){
-    const p=t.prices[0]
-    txt=`约 €${p?.price_monthly?.gross || '-'} /月`
+  if(t){
+    const p=t.prices?.find(x=>x.location===loc) || t.prices?.[0]
+    if(p?.price_monthly?.gross) txt=`约 €${p.price_monthly.gross} /月（${p.location}）`
   }
   byId('typePrice').textContent=txt
+}
+
+function preset(kind){
+  if(kind==='basic'){ byId('f_cores').value='2'; byId('f_mem').value='2' }
+  if(kind==='balanced'){ byId('f_cores').value='4'; byId('f_mem').value='8' }
+  if(kind==='pro'){ byId('f_cores').value='8'; byId('f_mem').value='16' }
+  renderTypeOptions()
 }
 
 async function loadData(){
