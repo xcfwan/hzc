@@ -55,6 +55,13 @@ async def rotate(server_id: int):
     return await monitor.rotate_server(server_id)
 
 
+@app.get('/api/snapshot_estimate/{server_id}')
+async def snapshot_estimate(server_id: int):
+    if not settings.hetzner_token:
+        raise HTTPException(status_code=500, detail='HETZNER_TOKEN missing')
+    return await monitor.estimate_snapshot(server_id)
+
+
 @app.post('/api/snapshot/{server_id}')
 async def snapshot(server_id: int):
     if not settings.hetzner_token:

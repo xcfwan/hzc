@@ -47,6 +47,8 @@ class MonitorService:
                 "name": s["name"],
                 "status": s["status"],
                 "ip": s.get("public_net", {}).get("ipv4", {}).get("ip", ""),
+                "server_type": s.get("server_type", {}).get("name", ""),
+                "disk_gb": s.get("server_type", {}).get("disk", 0),
                 "used_tb": round(used_tb, 3),
                 "limit_tb": settings.traffic_limit_tb,
                 "ratio": round(pct, 4),
@@ -95,10 +97,28 @@ class MonitorService:
         await self.tg.send(f"✅ Rotated {src['name']} -> {new_srv['server']['name']}")
         return {"ok": True, "new_server": new_srv}
 
+    async def estimate_snapshot(self, server_id: int):
+        servers = await self.client.list_servers()
+        src = next((s for s in servers if s["id"] == server_id), None)
+        if not src:
+            return {"ok": False, "error": "server not found"}
+        disk_gb = float(src.get("server_type", {}).get("disk", 0) or 0)
+        est_monthly = round(disk_gb * settings.snapshot_price_per_gb, 4)
+        return {
+            "ok": True,
+            "server_id": server_id,
+            "server_name": src.get("name"),
+            "disk_gb": disk_gb,
+            "snapshot_price_per_gb": settings.snapshot_price_per_gb,
+            "estimated_monthly_eur": est_monthly,
+        }
+
     async def create_snapshot_manual(self, server_id: int, description: str | None = None):
         if not description:
             description = f"manual-snap-{server_id}-{dt.datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
-        return await self.client.create_snapshot(server_id, description)
+        res = await self.client.create_snapshot(server_id, description)
+        await self.tg.send(f"📸 Snapshot started for server {server_id}: {description}")
+        return {"ok": True, "message": "snapshot job started", "action": res.get("action", {})}
 
     async def create_server_manual(self, name: str, server_type: str, location: str, image):
         created = await self.client.create_server(name=name, server_type=server_type, location=location, image=image)

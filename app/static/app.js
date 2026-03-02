@@ -139,13 +139,29 @@ async function loadData(){
 async function rotate(id){
   if(!confirm('确认重建该服务器？此操作会删除旧机。')) return
   const res=await fetch(`/api/rotate/${id}`,{method:'POST'})
-  alert(JSON.stringify(await res.json()))
+  const data=await res.json()
+  if(!res.ok){ alert(data?.detail || data?.error || '重建失败'); return }
+  alert('重建任务已提交')
   loadData();loadMeta()
 }
 
 async function snapshot(id){
+  const eRes=await fetch(`/api/snapshot_estimate/${id}`)
+  const est=await eRes.json()
+  if(!eRes.ok || !est?.ok){
+    alert('无法获取快照费用预估：'+(est?.detail||est?.error||'unknown'))
+    return
+  }
+  const msg=`服务器: ${est.server_name}\n预估快照体积: ${est.disk_gb} GB\n预估月费用: €${est.estimated_monthly_eur} (按 €${est.snapshot_price_per_gb}/GB 估算)\n\n确认创建快照？`
+  if(!confirm(msg)) return
+
   const res=await fetch(`/api/snapshot/${id}`,{method:'POST'})
-  alert('快照任务已提交：'+JSON.stringify(await res.json()))
+  const data=await res.json()
+  if(!res.ok || !data?.ok){
+    alert('快照创建失败：'+(data?.detail||data?.error||'unknown'))
+    return
+  }
+  alert('快照任务已提交成功')
   setTimeout(loadMeta, 5000)
 }
 
