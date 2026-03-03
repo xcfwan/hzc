@@ -57,7 +57,12 @@ class MonitorService:
         for s in servers:
             outbound = await self.client.get_outbound_bytes_month(s["id"])
             used_tb = outbound / BYTES_IN_TB
+            used_gb = outbound / (1024**3)
             pct = used_tb / settings.traffic_limit_tb
+            daily = await self.client.get_outbound_daily(s["id"], days=2)
+            today_gb = 0.0
+            if daily:
+                today_gb = (daily[-1].get("bytes", 0) / (1024**3))
             row = {
                 "id": s["id"],
                 "name": s["name"],
@@ -66,6 +71,8 @@ class MonitorService:
                 "server_type": s.get("server_type", {}).get("name", ""),
                 "disk_gb": s.get("server_type", {}).get("disk", 0),
                 "used_tb": round(used_tb, 3),
+                "used_gb": round(used_gb, 2),
+                "today_gb": round(today_gb, 2),
                 "limit_tb": settings.traffic_limit_tb,
                 "ratio": round(pct, 4),
                 "over_threshold": pct >= settings.rotate_threshold,

@@ -42,7 +42,7 @@ function rowHtml(r){
   return `<tr>
     <td>${r.id}</td><td>${r.name}</td><td>${r.ip||''}</td>
     <td><span class="badge ${r.status==='running'?'running':'other'}">${r.status}</span></td>
-    <td>${r.used_tb}</td><td>${r.limit_tb}</td>
+    <td>${r.used_gb} GB (${r.used_tb} TB)</td><td>${r.today_gb} GB</td><td>${r.limit_tb} TB</td>
     <td><div class="progress"><div class="bar ${warn?'warn':''}" style="width:${pct}%"></div></div><div class="ratio-text">${pct.toFixed(1)}%</div></td>
     <td><button class="btn-danger" onclick="rotate(${r.id})">重建</button> <button onclick="snapshot(${r.id})">创建快照</button></td>
   </tr>`
