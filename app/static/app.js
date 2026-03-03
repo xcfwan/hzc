@@ -105,6 +105,7 @@ function rowHtml(r){
     <td>
       <button class="btn action" onclick="openQBModal(${r.id})">配置qB</button>
       <button class="btn action" onclick="renameServer(${r.id}, '${(r.name||'').replace(/'/g,"\\'")}')">改名</button>
+      <button class="btn action" onclick="rebootServer(${r.id})">重启</button>
       <button class="btn btn-danger action" onclick="openRebuildModal(${r.id})">重建</button>
       <button class="btn snapshot action" onclick="snapshot(${r.id})">创建快照</button>
     </td>
@@ -205,6 +206,14 @@ async function renameServer(id, oldName){
   if(!r.ok||!d?.ok){alert(d?.detail||d?.error||'改名失败');return}
   toast('服务器名称已更新')
   loadData(false)
+}
+
+async function rebootServer(id){
+  if(!confirm(`确认重启服务器 ${id} ?`)) return
+  const r=await fetch(`/api/server/${id}/reboot`,{method:'POST'})
+  const d=await r.json()
+  if(!r.ok||!d?.ok){alert(d?.detail||d?.error||'重启失败');return}
+  toast('重启指令已提交')
 }
 
 function openRebuildModal(serverId){

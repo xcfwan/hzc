@@ -165,3 +165,11 @@ async def rename_server(server_id: int, req: RenameServerReq):
     if not settings.hetzner_token:
         raise HTTPException(status_code=500, detail='HETZNER_TOKEN missing')
     return await monitor.rename_server_manual(server_id, req.name)
+
+
+@app.post('/api/server/{server_id}/reboot')
+async def reboot_server(server_id: int):
+    if not settings.hetzner_token:
+        raise HTTPException(status_code=500, detail='HETZNER_TOKEN missing')
+    res = await monitor.op_server('reboot', server_id)
+    return {'ok': True, 'server_id': server_id, 'result': res}
