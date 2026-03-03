@@ -15,6 +15,9 @@ class Settings(BaseModel):
     telegram_chat_id: str = os.getenv("TELEGRAM_CHAT_ID", "")
     timezone: str = os.getenv("TZ", "UTC")
     snapshot_price_per_gb: float = float(os.getenv("SNAPSHOT_PRICE_PER_GB", "0.011"))
+    qb_url: str = os.getenv("QB_URL", "")
+    qb_username: str = os.getenv("QB_USERNAME", "")
+    qb_password: str = os.getenv("QB_PASSWORD", "")
 
 
 settings = Settings()
