@@ -37,7 +37,7 @@ function renderDailyStats(items){
       const h=Math.max(3,Math.round(v/max*28))
       const cls=v>=avg*2?'crit':(v>=avg*1.5?'hot':'')
       const tip=`${d.date}: ${v.toFixed(2)} GB`
-      return `<i class='${cls}' style='height:${h}px' title='${tip}' aria-label='${tip}'></i>`
+      return `<i class='${cls}' style='height:${h}px' data-tip='${tip.replace(/'/g,"&#39;")}'></i>`
     }).join('')
     const badge=level==='ok'?'':`<span class='badge-traffic ${level==='crit'?'badge-crit':'badge-warn'}'>${level==='crit'?'异常峰值':'高于均值'}</span>`
     return `<div class="daily-item"><b>${s.name}</b>${badge}<div class="spark">${bars||'<span class="daily-mini">无最近数据</span>'}</div></div>`
