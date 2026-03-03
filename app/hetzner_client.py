@@ -33,37 +33,52 @@ class HetznerClient:
             r.raise_for_status()
             return r.json().get("images", [])
 
+    def _pick_outbound_series(self, data: dict):
+        ts = data.get("metrics", {}).get("time_series", {})
+        # New Hetzner metric names (rate): bandwidth.out (bytes/s)
+        if "network.0.bandwidth.out" in ts:
+            return ts.get("network.0.bandwidth.out", []), "bandwidth"
+        # Backward compatibility
+        if "network.0.tx" in ts:
+            return ts.get("network.0.tx", []), "tx"
+        return [], "unknown"
+
     async def get_outbound_bytes_month(self, server_id: int) -> int:
         now = dt.datetime.utcnow()
+        step = 3600
         start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
         end = now.replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
-        params = {"type": "network", "start": start, "end": end, "step": "3600"}
+        params = {"type": "network", "start": start, "end": end, "step": str(step)}
         async with httpx.AsyncClient(timeout=30) as c:
             r = await c.get(f"{BASE}/servers/{server_id}/metrics", headers=self.headers, params=params)
             r.raise_for_status()
             data = r.json()
 
-        series = data.get("metrics", {}).get("time_series", {}).get("network.0.tx", [])
+        series, mode = self._pick_outbound_series(data)
         total = 0
         for point in series:
             if len(point) > 1 and point[1] is not None:
-                total += int(float(point[1]))
+                v = float(point[1])
+                total += int(v * step) if mode == "bandwidth" else int(v)
         return total
 
     async def get_outbound_daily(self, server_id: int, days: int = 7):
         now = dt.datetime.utcnow().replace(microsecond=0)
+        step = 86400
         start = (now - dt.timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
         end = now.strftime("%Y-%m-%dT%H:%M:%SZ")
-        params = {"type": "network", "start": start, "end": end, "step": "86400"}
+        params = {"type": "network", "start": start, "end": end, "step": str(step)}
         async with httpx.AsyncClient(timeout=30) as c:
             r = await c.get(f"{BASE}/servers/{server_id}/metrics", headers=self.headers, params=params)
             r.raise_for_status()
             data = r.json()
-        series = data.get("metrics", {}).get("time_series", {}).get("network.0.tx", [])
+        series, mode = self._pick_outbound_series(data)
         out = []
         for p in series:
             if len(p) > 1 and p[1] is not None:
-                out.append({"date": str(p[0])[:10], "bytes": int(float(p[1]))})
+                v = float(p[1])
+                b = int(v * step) if mode == "bandwidth" else int(v)
+                out.append({"date": str(p[0])[:10], "bytes": b})
         return out
 
     async def create_snapshot(self, server_id: int, description: str):
