@@ -106,6 +106,7 @@ function rowHtml(r){
       <button class="btn action" onclick="openQBModal(${r.id})">配置qB</button>
       <button class="btn action" onclick="renameServer(${r.id}, '${(r.name||'').replace(/'/g,"\\'")}')">改名</button>
       <button class="btn action" onclick="rebootServer(${r.id})">重启</button>
+      <button class="btn action" onclick="hardRebootServer(${r.id})">强制重启</button>
       <button class="btn btn-danger action" onclick="openRebuildModal(${r.id})">重建</button>
       <button class="btn snapshot action" onclick="snapshot(${r.id})">创建快照</button>
     </td>
@@ -208,12 +209,37 @@ async function renameServer(id, oldName){
   loadData(false)
 }
 
+async function pollAction(actionId, label='操作'){
+  if(!actionId) return
+  for(let i=0;i<20;i++){
+    await new Promise(r=>setTimeout(r,1500))
+    const rr=await fetch(`/api/action/${actionId}`)
+    const a=await rr.json()
+    const st=(a?.status||'').toLowerCase()
+    if(st==='success'){ toast(`${label}成功`) ; return }
+    if(st==='error'){ toast(`${label}失败`) ; return }
+  }
+  toast(`${label}处理中，请稍后刷新查看`)
+}
+
 async function rebootServer(id){
   if(!confirm(`确认重启服务器 ${id} ?`)) return
   const r=await fetch(`/api/server/${id}/reboot`,{method:'POST'})
   const d=await r.json()
   if(!r.ok||!d?.ok){alert(d?.detail||d?.error||'重启失败');return}
-  toast('重启指令已提交')
+  toast('重启指令已提交，正在检查结果...')
+  const aid=d?.result?.action?.id
+  pollAction(aid, `服务器 ${id} 重启`)
+}
+
+async function hardRebootServer(id){
+  if(!confirm(`确认强制重启服务器 ${id} ?\n将先关机再开机。`)) return
+  const r=await fetch(`/api/server/${id}/hard_reboot`,{method:'POST'})
+  const d=await r.json()
+  if(!r.ok||!d?.ok){alert(d?.detail||d?.error||'强制重启失败');return}
+  toast('强制重启已提交，正在检查开机动作...')
+  const aid=d?.poweron_action?.id
+  pollAction(aid, `服务器 ${id} 强制重启`)
 }
 
 function openRebuildModal(serverId){

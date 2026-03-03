@@ -277,6 +277,20 @@ class MonitorService:
             return {'ok': await self.client.delete_server(server_id)}
         return {'ok': False, 'error': 'unsupported cmd'}
 
+    async def get_action_status(self, action_id: int):
+        return await self.client.get_action(action_id)
+
+    async def hard_reboot(self, server_id: int):
+        off = await self.client.server_action(server_id, 'poweroff')
+        await asyncio.sleep(3)
+        on = await self.client.server_action(server_id, 'poweron')
+        return {
+            "ok": True,
+            "server_id": server_id,
+            "poweroff_action": (off or {}).get("action", off),
+            "poweron_action": (on or {}).get("action", on),
+        }
+
     async def rebuild_with_snapshot_manual(self, server_id: int, image_id: int):
         # Rebuild in-place: keep same server object (and public IP), do NOT auto-create new snapshot
         res = await self.client.server_action(server_id, 'rebuild', {'image': int(image_id)})

@@ -173,3 +173,17 @@ async def reboot_server(server_id: int):
         raise HTTPException(status_code=500, detail='HETZNER_TOKEN missing')
     res = await monitor.op_server('reboot', server_id)
     return {'ok': True, 'server_id': server_id, 'result': res}
+
+
+@app.post('/api/server/{server_id}/hard_reboot')
+async def hard_reboot_server(server_id: int):
+    if not settings.hetzner_token:
+        raise HTTPException(status_code=500, detail='HETZNER_TOKEN missing')
+    return await monitor.hard_reboot(server_id)
+
+
+@app.get('/api/action/{action_id}')
+async def action_status(action_id: int):
+    if not settings.hetzner_token:
+        raise HTTPException(status_code=500, detail='HETZNER_TOKEN missing')
+    return await monitor.get_action_status(action_id)
