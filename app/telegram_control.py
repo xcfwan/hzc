@@ -100,21 +100,26 @@ class TelegramControl:
             return await self.send(f"本月总出流量: {total:.2f} TB", chat_id)
 
         if cmd == "/qbstatus":
-            q = await self.monitor.qb_status()
-            if not q.get("enabled"):
+            rows = await self.monitor.collect()
+            qrows = [r for r in rows if (r.get("qb") or {}).get("enabled")]
+            if not qrows:
                 return await self.send("qB监控未配置", chat_id)
+
             def _fmt_speed(v):
                 return f"{v/1024/1024:.2f} MiB/s"
             def _fmt_total(v):
                 return f"{v/1024/1024/1024/1024:.2f} TiB"
-            return await self.send(
-                "qB状态\n"
-                f"连接: {q.get('connection_status')}\n"
-                f"实时: ↑ {_fmt_speed(q.get('up_speed',0))} / ↓ {_fmt_speed(q.get('dl_speed',0))}\n"
-                f"累计: ↑ {_fmt_total(q.get('up_total',0))} / ↓ {_fmt_total(q.get('dl_total',0))}\n"
-                f"任务: 活跃 {q.get('active_torrents',0)} / 总计 {q.get('all_torrents',0)}\n"
-                f"DHT: {q.get('dht_nodes',0)}"
-            , chat_id)
+
+            lines = ["qB状态（全部节点）"]
+            for r in qrows:
+                q = r.get("qb", {})
+                lines.append(
+                    f"\n[{r.get('name')}|{r.get('id')}] {q.get('connection_status','unknown')}"
+                    f"\n实时: ↑ {_fmt_speed(q.get('up_speed',0))} / ↓ {_fmt_speed(q.get('dl_speed',0))}"
+                    f"\n累计: ↑ {_fmt_total(q.get('up_total',0))} / ↓ {_fmt_total(q.get('dl_total',0))}"
+                    f"\n任务: {q.get('active_torrents',0)}/{q.get('all_torrents',0)}  DHT:{q.get('dht_nodes',0)}"
+                )
+            return await self.send("\n".join(lines)[:3800], chat_id)
 
         if cmd == "/traffic" and len(parts) >= 2:
             return await self.send(await self.monitor.traffic_text(int(parts[1])), chat_id)
