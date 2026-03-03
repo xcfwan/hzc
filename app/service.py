@@ -52,7 +52,10 @@ class MonitorService:
         servers = await self.client.list_servers()
         result = []
         for s in servers:
-            daily = await self.client.get_outbound_daily(s["id"], days=days)
+            try:
+                daily = await self.client.get_outbound_daily(s["id"], days=days)
+            except Exception:
+                daily = []
             result.append({"id": s["id"], "name": s["name"], "daily": daily})
         return result
 
@@ -74,7 +77,10 @@ class MonitorService:
             used_tb = outbound / BYTES_IN_TB
             used_gb = outbound / (1024**3)
             pct = used_tb / settings.traffic_limit_tb
-            daily = await self.client.get_outbound_daily(s["id"], days=2)
+            try:
+                daily = await self.client.get_outbound_daily(s["id"], days=2)
+            except Exception:
+                daily = []
             today_gb = 0.0
             if daily:
                 today_gb = (daily[-1].get("bytes", 0) / (1024**3))
