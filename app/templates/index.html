@@ -135,6 +135,23 @@
     </div>
   </div>
 
+  <div id="deleteModal" class="modal hidden">
+    <div class="modal-card glass">
+      <h3>删除服务器</h3>
+      <div class="grid">
+        <label>服务器ID<input id="del_server_id" readonly /></label>
+        <label><input id="del_make_snapshot" type="checkbox" /> 删除前创建快照</label>
+        <label><input id="del_keep_ipv4" type="checkbox" /> 保留IPv4（先解绑Primary IP）</label>
+        <label><input id="del_keep_ipv6" type="checkbox" /> 保留IPv6（先解绑Primary IP）</label>
+      </div>
+      <div class="hint" style="margin-top:8px">危险操作：服务器删除后不可恢复（除非保留快照/Primary IP）。</div>
+      <div class="modal-actions">
+        <button class="btn btn-danger" onclick="submitDeleteServer()">确认删除</button>
+        <button class="btn" onclick="closeDeleteModal()">取消</button>
+      </div>
+    </div>
+  </div>
+
   <div id="tgModal" class="modal hidden">
     <div class="modal-card glass">
       <h3>Telegram 配置</h3>

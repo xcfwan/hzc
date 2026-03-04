@@ -63,6 +63,12 @@ class RebuildReq(BaseModel):
     image_id: int | str
 
 
+class DeleteServerReq(BaseModel):
+    create_snapshot: bool = False
+    keep_ipv4: bool = False
+    keep_ipv6: bool = False
+
+
 class TelegramConfigReq(BaseModel):
     telegram_bot_token: str
     telegram_chat_id: str
@@ -270,6 +276,18 @@ async def hard_reboot_server(server_id: int):
     if not settings.hetzner_token:
         raise HTTPException(status_code=500, detail='HETZNER_TOKEN missing')
     return await monitor.hard_reboot(server_id)
+
+
+@app.post('/api/server/{server_id}/delete')
+async def delete_server(server_id: int, req: DeleteServerReq):
+    if not settings.hetzner_token:
+        raise HTTPException(status_code=500, detail='HETZNER_TOKEN missing')
+    return await monitor.delete_server_manual(
+        server_id,
+        create_snapshot=req.create_snapshot,
+        keep_ipv4=req.keep_ipv4,
+        keep_ipv6=req.keep_ipv6,
+    )
 
 
 @app.get('/api/action/{action_id}')

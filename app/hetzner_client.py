@@ -227,6 +227,18 @@ class HetznerClient:
             r.raise_for_status()
             return r.json()
 
+    async def get_server(self, server_id: int):
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.get(f"{BASE}/servers/{server_id}", headers=self.headers)
+            r.raise_for_status()
+            return r.json().get("server", {})
+
+    async def unassign_primary_ip(self, primary_ip_id: int):
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.post(f"{BASE}/primary_ips/{primary_ip_id}/actions/unassign", headers=self.headers, json={})
+            r.raise_for_status()
+            return r.json()
+
     async def rename_server(self, server_id: int, name: str):
         payload = {"name": name}
         async with httpx.AsyncClient(timeout=30) as c:

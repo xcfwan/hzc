@@ -133,6 +133,7 @@ function rowHtml(r){
       <button class="btn action" onclick="rebootServer(${r.id})">重启</button>
       <button class="btn action" onclick="hardRebootServer(${r.id})">强制重启</button>
       <button class="btn btn-danger action" onclick="openRebuildModal(${r.id})">重建</button>
+      <button class="btn btn-danger action" onclick="openDeleteModal(${r.id})">删除</button>
     </div></td>
   </tr>`
 }
@@ -220,8 +221,12 @@ async function loadMeta(showToast=false){
   byId('c_image').innerHTML=['<option value="debian-12">debian-12 (官方镜像)</option>'].concat(snaps).join('')
   const p4=(META.primary_ipv4s||[])
   const p6=(META.primary_ipv6s||[])
-  byId('c_primary_ip').innerHTML=['<option value="">自动分配IPv4</option>'].concat(p4.map(p=>`<option value="${p.id}">${p.ip}${p.name?` (${p.name})`:''}</option>`)).join('')
-  byId('c_primary_ipv6').innerHTML=['<option value="">自动分配IPv6</option>'].concat(p6.map(p=>`<option value="${p.id}">${p.ip}${p.name?` (${p.name})`:''}</option>`)).join('')
+  byId('c_primary_ip').innerHTML=['<option value="">自动分配IPv4</option>']
+    .concat(p4.length ? p4.map(p=>`<option value="${p.id}">${p.ip}${p.name?` (${p.name})`:''}</option>`) : ['<option value="" disabled>无可用IPv4</option>'])
+    .join('')
+  byId('c_primary_ipv6').innerHTML=['<option value="">自动分配IPv6</option>']
+    .concat(p6.length ? p6.map(p=>`<option value="${p.id}">${p.ip}${p.name?` (${p.name})`:''}</option>`) : ['<option value="" disabled>无可用IPv6</option>'])
+    .join('')
   byId('c_location').onchange=()=>{renderTypeOptions();showTypePrice()}
   byId('c_type').onchange=showTypePrice
   byId('f_cores').onchange=renderTypeOptions
@@ -374,6 +379,32 @@ function openRebuildModal(serverId){
   byId('rebuild_snapshot').innerHTML = optsOfficial + optsSnap
 }
 function closeRebuildModal(){ byId('rebuildModal').classList.add('hidden') }
+
+function openDeleteModal(serverId){
+  byId('deleteModal').classList.remove('hidden')
+  byId('del_server_id').value=serverId
+  byId('del_make_snapshot').checked=false
+  byId('del_keep_ipv4').checked=false
+  byId('del_keep_ipv6').checked=false
+}
+function closeDeleteModal(){ byId('deleteModal').classList.add('hidden') }
+
+async function submitDeleteServer(){
+  const sid=Number(byId('del_server_id').value)
+  const body={
+    create_snapshot: !!byId('del_make_snapshot').checked,
+    keep_ipv4: !!byId('del_keep_ipv4').checked,
+    keep_ipv6: !!byId('del_keep_ipv6').checked,
+  }
+  if(!confirm(`高风险确认：将删除服务器 ${sid}。请确认选项无误。`)) return
+  const verify = prompt('请输入 DELETE 确认执行：','')
+  if((verify||'').trim().toUpperCase() !== 'DELETE'){ alert('未确认，已取消'); return }
+  const r=await fetch(`/api/server/${sid}/delete`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)})
+  const d=await r.json()
+  if(!r.ok||!d?.ok){alert(d?.detail||d?.error||'删除失败');return}
+  toast('删除任务已完成')
+  closeDeleteModal(); loadAll(false)
+}
 
 async function submitRebuild(){
   const sid=Number(byId('rebuild_server_id').value)

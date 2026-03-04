@@ -305,6 +305,54 @@ class MonitorService:
             created["password_reset"] = rp
         return created
 
+    async def delete_server_manual(self, server_id: int, create_snapshot: bool = False, keep_ipv4: bool = False, keep_ipv6: bool = False):
+        srv = await self.client.get_server(server_id)
+        if not srv:
+            return {"ok": False, "error": "server not found"}
+
+        snapshot_action = None
+        snapshot_name = None
+        if create_snapshot:
+            snapshot_name = f"before-delete-{srv.get('name','server')}-{dt.datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+            snap_res = await self.client.create_snapshot(server_id, snapshot_name)
+            snapshot_action = (snap_res or {}).get("action", {})
+            action_id = snapshot_action.get("id")
+            if action_id:
+                for _ in range(180):  # up to ~15min
+                    act = await self.client.get_action(action_id)
+                    st = (act or {}).get("status")
+                    if st == "success":
+                        break
+                    if st == "error":
+                        return {"ok": False, "error": "snapshot failed", "action": act}
+                    await asyncio.sleep(5)
+
+        net = srv.get("public_net") or {}
+        ipv4_id = ((net.get("ipv4") or {}).get("id"))
+        ipv6_id = ((net.get("ipv6") or {}).get("id"))
+
+        kept = {"ipv4": None, "ipv6": None}
+        if keep_ipv4 and ipv4_id:
+            await self.client.unassign_primary_ip(int(ipv4_id))
+            kept["ipv4"] = int(ipv4_id)
+        if keep_ipv6 and ipv6_id:
+            await self.client.unassign_primary_ip(int(ipv6_id))
+            kept["ipv6"] = int(ipv6_id)
+
+        await self.client.delete_server(server_id)
+        await self.tg.send(
+            f"🗑️ 服务器已删除\nID: {server_id}\n名称: {srv.get('name','-')}\n"
+            f"快照: {'已创建' if create_snapshot else '未创建'}{f' ({snapshot_name})' if snapshot_name else ''}\n"
+            f"保留IPv4: {'是' if bool(kept['ipv4']) else '否'}\n保留IPv6: {'是' if bool(kept['ipv6']) else '否'}"
+        )
+        return {
+            "ok": True,
+            "deleted_server_id": server_id,
+            "snapshot_created": bool(create_snapshot),
+            "snapshot_name": snapshot_name,
+            "kept_primary_ip_ids": kept,
+        }
+
     async def delete_snapshot_manual(self, image_id: int):
         await self.client.delete_snapshot(image_id)
         await self.tg.send(f"🗑️ Snapshot deleted: {image_id}")
