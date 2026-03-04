@@ -26,8 +26,7 @@ git fetch origin main
 echo "[i] 强制同步到最新版（会覆盖本地代码改动）..."
 git reset --hard origin/main
 
-echo "[i] 重建并启动容器..."
-$COMPOSE_CMD down || true
+echo "[i] 重建并滚动更新容器（不中断脚本）..."
 $COMPOSE_CMD up -d --build
 
 echo "[ok] 升级完成"
