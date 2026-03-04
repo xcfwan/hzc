@@ -9,6 +9,9 @@ body{margin:0;color:var(--text);background:var(--bg);font-family:Inter,Arial,san
 .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.actions input{height:38px;min-width:220px;padding:0 12px;background:transparent;border:1px solid var(--line);border-radius:10px;color:var(--text)}
 .btn{height:36px;padding:0 12px;border-radius:10px;border:1px solid var(--line);background:#eef3ff;color:#22314f;cursor:pointer;transition:.15s ease;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600}.btn:hover{transform:translateY(-1px);filter:brightness(1.02)}
 .btn.primary{background:#4f74d8;border-color:#6f8ee0;color:#fff}.btn.ghost{background:transparent;color:var(--text)}.btn.small{height:30px;padding:0 9px;font-size:12px}
+#safeModeBtn{min-width:96px}
+#safeModeBtn.safe-on{background:#16a34a;border-color:#22c55e;color:#fff}
+#safeModeBtn.safe-off{background:#111827;border-color:#1f2937;color:#fff}
 .btn.action{min-width:64px;height:30px;padding:0 8px;font-size:12px;border-radius:9px}
 .icon-btn{height:18px;width:18px;margin-left:4px;border:none;background:transparent;color:#111;cursor:pointer;line-height:1;font-size:15px;transform:skewX(-12deg);padding:0}
 .icon-btn:hover{opacity:.75}

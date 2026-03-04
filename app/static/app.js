@@ -209,7 +209,11 @@ async function loadSafeMode(){
   const d=await r.json()
   const on=!!d.safe_mode
   const b=byId('safeModeBtn')
-  if(b) b.textContent = on ? '安全模式：开启' : '安全模式：关闭'
+  if(b){
+    b.textContent = on ? '🛡️ 安全ON' : '🛡️ 安全OFF'
+    b.classList.toggle('safe-on', on)
+    b.classList.toggle('safe-off', !on)
+  }
 }
 
 async function toggleSafeMode(){
@@ -399,8 +403,15 @@ function openAutoPolicyModal(serverId){
   const p = AUTO_POLICIES[String(serverId)] || {}
   byId('ap_enabled').checked = !!p.enabled
   byId('ap_threshold').value = p.threshold ?? '0.95'
+  const official=[
+    {id:'debian-12',name:'官方镜像 Debian 12'},
+    {id:'ubuntu-24.04',name:'官方镜像 Ubuntu 24.04'},
+    {id:'ubuntu-22.04',name:'官方镜像 Ubuntu 22.04'},
+  ]
   const snaps=(META.snapshots||[])
-  byId('ap_image_id').innerHTML = '<option value="">请选择快照</option>' + snaps.map(s=>`<option value="${s.id}">#${s.id} ${s.name||''}</option>`).join('')
+  const optsOfficial=official.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')
+  const optsSnap=snaps.map(s=>`<option value="${s.id}">快照 #${s.id} ${s.name||''}</option>`).join('')
+  byId('ap_image_id').innerHTML = '<option value="">请选择镜像/快照</option>' + optsOfficial + optsSnap
   byId('ap_image_id').value = p.image_id ? String(p.image_id) : ''
 }
 function closeAutoPolicyModal(){ byId('autoPolicyModal').classList.add('hidden') }
