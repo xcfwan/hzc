@@ -181,6 +181,13 @@ async def rebuild(server_id: int, req: RebuildReq):
     return await monitor.rebuild_with_snapshot_manual(server_id, req.image_id)
 
 
+@app.post('/api/rebuild_full/{server_id}')
+async def rebuild_full(server_id: int, req: RebuildReq):
+    if not settings.hetzner_token:
+        raise HTTPException(status_code=500, detail='HETZNER_TOKEN missing')
+    return await monitor.rebuild_full_manual(server_id, req.image_id)
+
+
 @app.get('/api/safe_mode')
 async def safe_mode_get():
     return {"safe_mode": monitor.get_safe_mode()}

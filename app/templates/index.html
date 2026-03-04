@@ -121,9 +121,13 @@
         <label>服务器ID<input id="rebuild_server_id" readonly /></label>
         <label>选择镜像/快照<select id="rebuild_snapshot"></select></label>
       </div>
-      <div class="hint" style="margin-top:8px">说明：原地重建，不自动创建新快照，保留原服务器IP。</div>
+      <div class="hint" style="margin-top:8px">说明：
+        ①确认重建 = 原地重建（保留IP）
+        ②完全重建(换IP) = 新建后删旧，获得新IP
+      </div>
       <div class="modal-actions">
-        <button class="btn btn-danger" onclick="submitRebuild()">确认重建</button>
+        <button class="btn btn-danger" onclick="submitRebuild()">确认重建（保留IP）</button>
+        <button class="btn btn-danger" onclick="submitFullRebuild()">完全重建（换IP）</button>
         <button class="btn" onclick="closeRebuildModal()">取消</button>
       </div>
     </div>

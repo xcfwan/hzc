@@ -385,6 +385,20 @@ async function submitRebuild(){
   closeRebuildModal(); loadAll(false)
 }
 
+async function submitFullRebuild(){
+  const sid=Number(byId('rebuild_server_id').value)
+  const imageId=byId('rebuild_snapshot').value
+  if(!imageId){alert('请先选择镜像或快照');return}
+  if(!confirm(`高风险确认：将完全重建服务器 ${sid}，丢弃旧IP并使用新IP，继续吗？`)) return
+  const verify = prompt('请输入 FULLREBUILD 确认执行：','')
+  if((verify||'').trim().toUpperCase() !== 'FULLREBUILD'){ alert('未确认，已取消'); return }
+  const r=await fetch(`/api/rebuild_full/${sid}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({image_id:imageId})})
+  const d=await r.json()
+  if(!r.ok||!d?.ok){alert(d?.detail||d?.error||'完全重建失败');return}
+  toast('完全重建已提交（将更换IP）')
+  closeRebuildModal(); loadAll(false)
+}
+
 async function snapshot(id, snapName){
   const e=await fetch(`/api/snapshot_estimate/${id}`),est=await e.json();
   if(!e.ok||!est?.ok){alert('无法获取快照费用预估');return}

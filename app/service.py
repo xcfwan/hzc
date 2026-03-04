@@ -360,6 +360,27 @@ class MonitorService:
         await self.tg.send(f"♻️ 重建已提交\n服务器ID: {server_id}\n镜像/快照: {image}\n说明: 原地重建，保留原服务器IP")
         return {"ok": True, "server_id": server_id, "image_id": image, "action": res.get("action", res)}
 
+    async def rebuild_full_manual(self, server_id: int, image_id):
+        # Full rebuild: create a NEW server from selected image/snapshot then delete old one => new IP
+        servers = await self.client.list_servers()
+        src = next((s for s in servers if s["id"] == server_id), None)
+        if not src:
+            return {"ok": False, "error": "server not found"}
+
+        image = int(image_id) if str(image_id).isdigit() else str(image_id)
+        created = await self.client.create_server(
+            name=src.get("name", f"server-{server_id}"),
+            server_type=src.get("server_type", {}).get("name"),
+            location=src.get("datacenter", {}).get("location", {}).get("name"),
+            image=image,
+        )
+        await self.client.delete_server(server_id)
+        new_srv = created.get("server", {})
+        await self.tg.send(
+            f"🧨 完全重建已完成（换IP）\n旧服务器ID: {server_id}\n新服务器ID: {new_srv.get('id')}\n新IP: {new_srv.get('public_net',{}).get('ipv4',{}).get('ip','-')}\n镜像/快照: {image}"
+        )
+        return {"ok": True, "old_server_id": server_id, "new_server": new_srv, "image_id": image}
+
     async def rename_server_manual(self, server_id: int, name: str):
         data = await self.client.rename_server(server_id, name)
         await self.tg.send(f"✏️ Server renamed: {server_id} -> {name}")
