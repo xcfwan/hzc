@@ -21,6 +21,9 @@ class MonitorService:
         self.auto_policy = AutoPolicyStore(settings.auto_policy_path)
         self.runtime = RuntimeConfig(settings.runtime_config_path)
         self.last_snapshot = []
+        self._collect_cache = []
+        self._collect_cache_ts = 0.0
+        self._collect_cache_ttl = 6.0
 
     async def meta(self):
         types = await self.client.list_server_types()
@@ -64,7 +67,12 @@ class MonitorService:
             result.append({"id": s["id"], "name": s["name"], "daily": daily})
         return result
 
-    async def collect(self):
+    async def collect(self, use_cache: bool = True):
+        if use_cache:
+            now_ts = dt.datetime.utcnow().timestamp()
+            if self._collect_cache and (now_ts - self._collect_cache_ts) < self._collect_cache_ttl:
+                return self._collect_cache
+
         servers = await self.client.list_servers()
         rows = []
 
@@ -121,6 +129,8 @@ class MonitorService:
             }
             rows.append(row)
         self.last_snapshot = rows
+        self._collect_cache = rows
+        self._collect_cache_ts = dt.datetime.utcnow().timestamp()
         return rows
 
     def get_safe_mode(self):
@@ -134,7 +144,7 @@ class MonitorService:
         return {"ok": True, "safe_mode": bool(enabled)}
 
     async def rotate_if_needed(self):
-        rows = await self.collect()
+        rows = await self.collect(use_cache=False)
         safe_mode = self.get_safe_mode()
         for row in rows:
             pol = row.get("auto_policy") or {}

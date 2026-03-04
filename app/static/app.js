@@ -202,12 +202,17 @@ function showTypePrice(){
 
 function preset(k){if(k==='basic'){byId('f_cores').value='2';byId('f_mem').value='2';byId('f_family').value='cpx'} if(k==='balanced'){byId('f_cores').value='4';byId('f_mem').value='8';byId('f_family').value='cpx'} if(k==='pro'){byId('f_cores').value='8';byId('f_mem').value='16';byId('f_family').value=''} renderTypeOptions()}
 
+let __loadingData=false
 async function loadData(showToast=false){
-  const kw=(byId('kw').value||'').trim().toLowerCase(),r=await fetch('/api/servers'),data=await r.json(); CURRENT_SERVERS=data
-  renderCards(data)
-  const f=data.filter(x=>!kw||String(x.name).toLowerCase().includes(kw)||String(x.ip||'').toLowerCase().includes(kw)||String(x.id).includes(kw))
-  byId('tb').querySelector('tbody').innerHTML=f.map(rowHtml).join('')
-  if(showToast) toast('已刷新')
+  if(__loadingData) return
+  __loadingData=true
+  try{
+    const kw=(byId('kw').value||'').trim().toLowerCase(),r=await fetch('/api/servers'),data=await r.json(); CURRENT_SERVERS=data
+    renderCards(data)
+    const f=data.filter(x=>!kw||String(x.name).toLowerCase().includes(kw)||String(x.ip||'').toLowerCase().includes(kw)||String(x.id).includes(kw))
+    byId('tb').querySelector('tbody').innerHTML=f.map(rowHtml).join('')
+    if(showToast) toast('已刷新')
+  } finally { __loadingData=false }
 }
 async function loadDaily(showToast=false){const r=await fetch('/api/daily_stats?days=7');renderDailyStats(await r.json()); if(showToast) toast('统计已刷新')}
 
