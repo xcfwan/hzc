@@ -53,6 +53,13 @@ class TelegramConfigReq(BaseModel):
     telegram_chat_id: str
 
 
+class AutoPolicyReq(BaseModel):
+    server_id: int
+    enabled: bool = True
+    threshold: float
+    image_id: int | None = None
+
+
 @app.on_event('startup')
 async def startup_event():
     if settings.hetzner_token:
@@ -107,6 +114,21 @@ async def qb_node_set(req: QBNodeReq):
 @app.delete('/api/qb_node/{server_id}')
 async def qb_node_delete(server_id: int):
     return monitor.qb_node_delete(server_id)
+
+
+@app.get('/api/auto_policies')
+async def auto_policies():
+    return monitor.auto_policies()
+
+
+@app.post('/api/auto_policy')
+async def auto_policy_set(req: AutoPolicyReq):
+    return monitor.auto_policy_set(req.server_id, req.enabled, req.threshold, req.image_id)
+
+
+@app.delete('/api/auto_policy/{server_id}')
+async def auto_policy_delete(server_id: int):
+    return monitor.auto_policy_delete(server_id)
 
 
 @app.get('/api/config/telegram')

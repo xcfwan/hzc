@@ -3,6 +3,7 @@ let META={server_types:[],locations:[],snapshots:[]}
 let CURRENT_SERVERS=[]
 let DAILY_MAP={}
 let QB_NODES={}
+let AUTO_POLICIES={}
 
 const toast=(msg)=>{const t=byId('toast');t.textContent=msg;t.classList.remove('hidden');clearTimeout(window.__toastT);window.__toastT=setTimeout(()=>t.classList.add('hidden'),2200)}
 
@@ -104,6 +105,7 @@ function rowHtml(r){
     <td><div class="progress"><div class="bar ${warn?'warn':''}" style="width:${pct}%"></div></div><div class="ratio-text">${pct.toFixed(1)}%</div></td>
     <td>
       <button class="btn action" onclick="openQBModal(${r.id})">配置qB</button>
+      <button class="btn action" onclick="openAutoPolicyModal(${r.id})">自动策略</button>
       <button class="btn action" onclick="renameServer(${r.id}, '${(r.name||'').replace(/'/g,"\\'")}')">改名</button>
       <button class="btn action" onclick="rebootServer(${r.id})">重启</button>
       <button class="btn action" onclick="hardRebootServer(${r.id})">强制重启</button>
@@ -198,7 +200,12 @@ async function loadQBNodes(){
   QB_NODES = await r.json()
 }
 
-async function loadAll(showToast=false){await Promise.all([loadMeta(false),loadQBNodes(),loadData(false),loadDaily(false)]); if(showToast) toast('全部数据已刷新')}
+async function loadAutoPolicies(){
+  const r=await fetch('/api/auto_policies')
+  AUTO_POLICIES = await r.json()
+}
+
+async function loadAll(showToast=false){await Promise.all([loadMeta(false),loadQBNodes(),loadAutoPolicies(),loadData(false),loadDaily(false)]); if(showToast) toast('全部数据已刷新')}
 
 async function renameServer(id, oldName){
   const n=prompt('请输入新的服务器名称：', oldName||`server-${id}`)
@@ -358,6 +365,44 @@ function openQBModal(serverId){
   byId('qb_pass').value = n.password || ''
 }
 function closeQBModal(){ byId('qbModal').classList.add('hidden') }
+
+function openAutoPolicyModal(serverId){
+  byId('autoPolicyModal').classList.remove('hidden')
+  byId('ap_server_id').value = serverId
+  const p = AUTO_POLICIES[String(serverId)] || {}
+  byId('ap_enabled').checked = !!p.enabled
+  byId('ap_threshold').value = p.threshold ?? '0.95'
+  const snaps=(META.snapshots||[])
+  byId('ap_image_id').innerHTML = '<option value="">请选择快照</option>' + snaps.map(s=>`<option value="${s.id}">#${s.id} ${s.name||''}</option>`).join('')
+  byId('ap_image_id').value = p.image_id ? String(p.image_id) : ''
+}
+function closeAutoPolicyModal(){ byId('autoPolicyModal').classList.add('hidden') }
+
+async function saveAutoPolicy(){
+  const body={
+    server_id:Number(byId('ap_server_id').value),
+    enabled:!!byId('ap_enabled').checked,
+    threshold:Number(byId('ap_threshold').value||0),
+    image_id: byId('ap_image_id').value ? Number(byId('ap_image_id').value) : null,
+  }
+  if(body.enabled && (!body.threshold || body.threshold<=0 || body.threshold>1)){ alert('阈值需在 0~1 之间，例如 0.95'); return }
+  if(body.enabled && !body.image_id){ alert('开启自动策略时必须选择用于重建的已有快照'); return }
+  const r=await fetch('/api/auto_policy',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)})
+  const d=await r.json()
+  if(!r.ok||!d?.ok){ alert(d?.detail||d?.error||'保存失败'); return }
+  toast('自动策略已保存')
+  closeAutoPolicyModal(); loadAll(false)
+}
+
+async function deleteAutoPolicy(){
+  const sid=Number(byId('ap_server_id').value)
+  if(!confirm(`确认删除服务器 ${sid} 的自动策略？`)) return
+  const r=await fetch(`/api/auto_policy/${sid}`,{method:'DELETE'})
+  const d=await r.json()
+  if(!r.ok||!d?.ok){ alert(d?.detail||d?.error||'删除失败'); return }
+  toast('自动策略已删除')
+  closeAutoPolicyModal(); loadAll(false)
+}
 
 async function saveQBNode(){
   const body={

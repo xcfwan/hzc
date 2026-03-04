@@ -5,6 +5,7 @@ from app.hetzner_client import HetznerClient
 from app.telegram_bot import Tg
 from app.qb_client import QBClient
 from app.qb_store import QBStore
+from app.auto_policy_store import AutoPolicyStore
 
 # Keep same unit behavior as Hetzner panel (binary TiB, though UI labels TB)
 BYTES_IN_TB = 1024**4
@@ -16,6 +17,7 @@ class MonitorService:
         self.tg = Tg(settings.telegram_bot_token, settings.telegram_chat_id)
         self.qb = QBClient(settings.qb_url, settings.qb_username, settings.qb_password)
         self.qb_store = QBStore(settings.qb_store_path)
+        self.auto_policy = AutoPolicyStore(settings.auto_policy_path)
         self.last_snapshot = []
 
     async def meta(self):
@@ -65,6 +67,7 @@ class MonitorService:
         rows = []
 
         qb_nodes = self.qb_store.get_all()
+        policies = self.auto_policy.all()
         qb_tasks = {}
         for sid, node in qb_nodes.items():
             qb_tasks[str(sid)] = asyncio.create_task(QBClient.fetch_stats(node.get("url", ""), node.get("username", ""), node.get("password", "")))
@@ -91,6 +94,7 @@ class MonitorService:
                 except Exception as e:
                     qbs = {"enabled": True, "error": str(e)}
 
+            pol = policies.get(str(s["id"]), {})
             row = {
                 "id": s["id"],
                 "name": s["name"],
@@ -107,8 +111,9 @@ class MonitorService:
                 "today_bytes": int(daily[-1].get("bytes", 0) if daily else 0),
                 "limit_tb": round(included_tb, 8),
                 "ratio": round(pct, 4),
-                "over_threshold": pct >= settings.rotate_threshold,
+                "over_threshold": pct >= float(pol.get("threshold", settings.rotate_threshold)),
                 "qb": qbs,
+                "auto_policy": pol,
             }
             rows.append(row)
         self.last_snapshot = rows
@@ -117,11 +122,19 @@ class MonitorService:
     async def rotate_if_needed(self):
         rows = await self.collect()
         for row in rows:
+            pol = row.get("auto_policy") or {}
+            enabled = bool(pol.get("enabled", False))
+            if not enabled:
+                continue
             if row["over_threshold"]:
                 if settings.safe_mode:
-                    await self.tg.send(f"⚠️ SAFE_MODE 告警: {row['name']} 流量占比 {round(row['ratio']*100,2)}%，仅通知不执行删除/重建")
+                    await self.tg.send(f"⚠️ SAFE_MODE 告警: {row['name']} 达到自动阈值 {pol.get('threshold', settings.rotate_threshold)}，仅通知不执行")
                     continue
-                await self.rotate_server(row["id"])
+                image_id = pol.get("image_id")
+                if not image_id:
+                    await self.tg.send(f"⚠️ {row['name']} 达到阈值，但未配置重建快照ID，已跳过")
+                    continue
+                await self.rebuild_with_snapshot_manual(row["id"], int(image_id))
 
     async def rotate_server(self, server_id: int):
         servers = await self.client.list_servers()
@@ -338,6 +351,22 @@ class MonitorService:
 
     def qb_node_delete(self, server_id: int):
         self.qb_store.delete(server_id)
+        return {"ok": True, "server_id": server_id}
+
+    def auto_policies(self):
+        return self.auto_policy.all()
+
+    def auto_policy_set(self, server_id: int, enabled: bool, threshold: float, image_id: int | None = None):
+        p = {
+            "enabled": bool(enabled),
+            "threshold": float(threshold),
+            "image_id": int(image_id) if image_id else None,
+        }
+        self.auto_policy.set(server_id, p)
+        return {"ok": True, "server_id": server_id, "policy": p}
+
+    def auto_policy_delete(self, server_id: int):
+        self.auto_policy.delete(server_id)
         return {"ok": True, "server_id": server_id}
 
 
