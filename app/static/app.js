@@ -96,7 +96,7 @@ function rowHtml(r){
 
   return `<tr>
     <td><span title="点击复制ID" onclick="copyText('${r.id}')" style="cursor:pointer">${r.id}</span></td>
-    <td>${r.name}</td>
+    <td><span class='name-wrap'>${r.name}</span><button class='icon-btn' title='修改名称' onclick="renameServer(${r.id}, '${(r.name||'').replace(/'/g,"\\'")}')">✏️</button></td>
     <td>${r.server_type || '-'} · ${r.cores||0}C/${r.memory_gb||0}GB/${r.disk_gb||0}GB</td>
     <td>${r.ip||''}</td>
     <td><span class="badge ${r.status==='running'?'running':'other'}">${r.status}</span></td>
@@ -106,7 +106,6 @@ function rowHtml(r){
     <td>
       <button class="btn action" onclick="openQBModal(${r.id})">配置qB</button>
       <button class="btn action" onclick="openAutoPolicyModal(${r.id})">自动策略</button>
-      <button class="btn action" onclick="renameServer(${r.id}, '${(r.name||'').replace(/'/g,"\\'")}')">改名</button>
       <button class="btn action" onclick="rebootServer(${r.id})">重启</button>
       <button class="btn action" onclick="hardRebootServer(${r.id})">强制重启</button>
       <button class="btn btn-danger action" onclick="openRebuildModal(${r.id})">重建</button>
@@ -210,7 +209,7 @@ async function loadSafeMode(){
   const d=await r.json()
   const on=!!d.safe_mode
   const b=byId('safeModeBtn')
-  if(b) b.textContent = on ? 'SAFE_MODE: ON' : 'SAFE_MODE: OFF'
+  if(b) b.textContent = on ? '安全模式：开启' : '安全模式：关闭'
 }
 
 async function toggleSafeMode(){
@@ -223,7 +222,12 @@ async function toggleSafeMode(){
   loadSafeMode()
 }
 
-async function loadAll(showToast=false){await Promise.all([loadMeta(false),loadQBNodes(),loadAutoPolicies(),loadData(false),loadDaily(false),loadSafeMode()]); if(showToast) toast('全部数据已刷新')}
+async function loadAll(showToast=false){
+  await Promise.all([loadMeta(false),loadQBNodes(),loadAutoPolicies(),loadData(false),loadSafeMode()])
+  // defer heavy chart data to improve first paint smoothness
+  setTimeout(()=>loadDaily(false), 0)
+  if(showToast) toast('全部数据已刷新')
+}
 
 async function renameServer(id, oldName){
   const n=prompt('请输入新的服务器名称：', oldName||`server-${id}`)
@@ -452,4 +456,4 @@ async function deleteQBNode(){
 }
 
 byId('kw').addEventListener('input',()=>loadData(false))
-initTheme(); loadAll(false); setInterval(()=>loadData(false),5000)
+initTheme(); loadAll(false); setInterval(()=>loadData(false),8000)
