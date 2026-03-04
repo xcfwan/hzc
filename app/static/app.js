@@ -69,9 +69,7 @@ function formatTB2(bytes){
 
 function formatTBPrecise(v){
   const n=Number(v||0)
-  let s=n.toFixed(8)
-  s=s.replace(/\.0+$/,'').replace(/(\.\d*?)0+$/,'$1')
-  return `${s} TB`
+  return `${n.toFixed(2)} TB`
 }
 
 function policyImageLabel(imageId){
@@ -90,12 +88,9 @@ function policyImageLabel(imageId){
 
 function rowHtml(r){
   const pct=Math.min(100,(r.ratio||0)*100),warn=r.over_threshold
-  const daily=DAILY_MAP[r.id]||[]
-  const gb=daily.map(x=>x.bytes/1024/1024/1024)
-  const avg=gb.length?gb.reduce((a,b)=>a+b,0)/gb.length:0
-  const today=Number(r.today_gb||0)
-  const anomaly=avg>0 && today>=avg*2 ? 'crit' : (avg>0 && today>=avg*1.5 ? 'warn' : '')
-  const todayCell=`${formatIEC(r.today_bytes)} (${formatTB2(r.today_bytes)}) ${anomaly?`<span class='badge-traffic ${anomaly==='crit'?'badge-crit':'badge-warn'}'>${anomaly==='crit'?'异常':'偏高'}</span>`:''}`
+  const todayPct = ((Number(r.today_bytes||0) / (Number(r.limit_tb||20)*1024*1024*1024*1024)) * 100)
+  const anomaly=todayPct>=8 ? 'crit' : (todayPct>=3 ? 'warn' : '')
+  const todayCell=`${formatIEC(r.today_bytes)} ${anomaly?`<span class='badge-traffic ${anomaly==='crit'?'badge-crit':'badge-warn'}'>${anomaly==='crit'?'异常':'偏高'}</span>`:''}`
 
   const q=r.qb||{}
   const p=r.auto_policy||{}
@@ -103,7 +98,8 @@ function rowHtml(r){
   const policyLabel=policyOn ? `策略 ${Math.round((Number(p.threshold||0))*100)}% · ${policyImageLabel(p.image_id)}` : '自动策略'
   const policyBtnClass = policyOn ? 'btn action policy-on' : 'btn action policy-off'
   const usedPct = Math.min(100, ((Number(r.used_tb||0) / Number(r.limit_tb||20)) * 100))
-  const usedCell = `<div class="progress progress-mini"><div class="bar ${warn?'warn':''}" style="width:${usedPct}%"></div></div><div class="ratio-text">${formatTBPrecise(r.used_tb)} / ${formatTBPrecise(r.limit_tb)}</div>`
+  const hue = Math.max(0, 220 - Math.round(usedPct*2.2))
+  const usedCell = `<div class="ratio-text">${usedPct.toFixed(1)}%</div><div class="progress progress-mini" title="${usedPct.toFixed(1)}%"><div class="bar" style="width:${usedPct}%;background:hsl(${hue} 85% 50%)"></div></div><div class="daily-mini">${formatTBPrecise(r.used_tb)}</div>`
   const qbCell = q.enabled
     ? `<div class='qb-line'>
          <span class='qb-col'>↑ ${formatIECps(q.up_speed)}</span>
@@ -124,8 +120,7 @@ function rowHtml(r){
     <td>${r.ip||''}</td>
     <td><span class="badge ${r.status==='running'?'running':'other'}">${r.status}</span></td>
     <td>${qbCell}</td>
-    <td>${usedCell}</td><td>${todayCell}</td><td>${formatTBPrecise(r.limit_tb)}</td>
-    <td><div class="ratio-text">${pct.toFixed(1)}%</div></td>
+    <td>${usedCell}</td><td>${todayCell}</td>
     <td><div class="op-row">
       <button class="btn action" onclick="openQBModal(${r.id})">配置qB</button>
       <button class="${policyBtnClass}" onclick="openAutoPolicyModal(${r.id})" title="${policyLabel}">${policyLabel}</button>
