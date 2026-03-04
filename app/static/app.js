@@ -96,7 +96,7 @@ function rowHtml(r){
 
   return `<tr>
     <td><span title="点击复制ID" onclick="copyText('${r.id}')" style="cursor:pointer">${r.id}</span></td>
-    <td><span class='name-wrap'>${r.name}</span><button class='icon-btn' title='修改名称' onclick="renameServer(${r.id}, '${(r.name||'').replace(/'/g,"\\'")}')">✏️</button></td>
+    <td><span class='name-wrap'>${r.name}</span><button class='icon-btn' title='修改名称' onclick="renameServer(${r.id}, '${(r.name||'').replace(/'/g,"\\'")}')">✎</button></td>
     <td>${r.server_type || '-'} · ${r.cores||0}C/${r.memory_gb||0}GB/${r.disk_gb||0}GB</td>
     <td>${r.ip||''}</td>
     <td><span class="badge ${r.status==='running'?'running':'other'}">${r.status}</span></td>
