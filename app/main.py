@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from pydantic import BaseModel
+import asyncio
 
 from app.config import settings
 from app.service import monitor
@@ -116,6 +117,14 @@ async def telegram_config_get():
 @app.put('/api/config/telegram')
 async def telegram_config_set(req: TelegramConfigReq):
     return tg_control.set_telegram_config(req.telegram_bot_token, req.telegram_chat_id)
+
+
+@app.post('/api/service/restart')
+async def service_restart():
+    cmd = "nohup bash -lc 'cd /opt/hzc && (docker-compose restart hetzner-traffic-guard || docker compose restart hetzner-traffic-guard)' >/tmp/hzc-restart.log 2>&1 &"
+    p = await asyncio.create_subprocess_shell(cmd)
+    await p.communicate()
+    return {"ok": True, "message": "restart triggered"}
 
 
 @app.post('/api/rotate/{server_id}')

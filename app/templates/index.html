@@ -130,7 +130,9 @@
       </div>
       <div class="hint" style="margin-top:8px">保存后将写入本地配置文件（/app/state/runtime_config.json）。建议重启服务后生效。</div>
       <div class="modal-actions">
-        <button class="btn primary" onclick="saveTGConfig()">保存</button>
+        <button class="btn primary" onclick="saveTGConfig(false)">保存</button>
+        <button class="btn btn-danger" onclick="saveTGConfig(true)">保存并重启服务</button>
+        <button class="btn" onclick="restartService()">一键重启服务</button>
         <button class="btn" onclick="closeTGModal()">关闭</button>
       </div>
     </div>
