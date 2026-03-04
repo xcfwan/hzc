@@ -10,8 +10,13 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! docker compose version >/dev/null 2>&1; then
-  echo "[x] docker compose 不可用，请先安装 Docker Compose 插件。"
+COMPOSE_CMD=""
+if docker compose version >/dev/null 2>&1; then
+  COMPOSE_CMD="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+  COMPOSE_CMD="docker-compose"
+else
+  echo "[x] docker compose / docker-compose 不可用。"
   exit 1
 fi
 
@@ -27,11 +32,11 @@ echo "[i] 强制同步到最新版（会覆盖本地代码改动）..."
 git reset --hard origin/main
 
 echo "[i] 重建并启动容器..."
-docker compose down || true
-docker compose up -d --build
+$COMPOSE_CMD down || true
+$COMPOSE_CMD up -d --build
 
 echo "[ok] 升级完成"
 echo "状态："
-docker compose ps
+$COMPOSE_CMD ps
 
 echo "访问: http://$(hostname -I | awk '{print $1}'):1227"
