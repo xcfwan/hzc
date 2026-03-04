@@ -71,6 +71,20 @@ function formatTBPrecise(v){
   return `${s} TB`
 }
 
+function policyImageLabel(imageId){
+  const v=String(imageId||'')
+  if(!v) return ''
+  const official={
+    'debian-12':'Debian 12',
+    'ubuntu-24.04':'Ubuntu 24.04',
+    'ubuntu-22.04':'Ubuntu 22.04',
+  }
+  if(official[v]) return official[v]
+  const s=(META.snapshots||[]).find(x=>String(x.id)===v)
+  if(s) return `快照#${s.id}${s.name?` ${s.name}`:''}`
+  return v
+}
+
 function rowHtml(r){
   const pct=Math.min(100,(r.ratio||0)*100),warn=r.over_threshold
   const daily=DAILY_MAP[r.id]||[]
@@ -83,7 +97,7 @@ function rowHtml(r){
   const q=r.qb||{}
   const p=r.auto_policy||{}
   const policyOn=!!p.enabled
-  const policyLabel=policyOn ? `策略 ${Math.round((Number(p.threshold||0))*100)}% · ${p.image_id||''}` : '自动策略'
+  const policyLabel=policyOn ? `策略 ${Math.round((Number(p.threshold||0))*100)}% · ${policyImageLabel(p.image_id)}` : '自动策略'
   const policyBtnClass = policyOn ? 'btn action policy-on' : 'btn action'
   const qbCell = q.enabled
     ? `<div class='qb-line'>
