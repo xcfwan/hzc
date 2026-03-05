@@ -222,14 +222,14 @@ async function loadMeta(showToast=false){
   const p4=(META.primary_ipv4s||[])
   const p6=(META.primary_ipv6s||[])
   byId('c_primary_ip').innerHTML = p4.length
-    ? ['<option value="">请选择已有IPv4（可选）</option>'].concat(p4.map(p=>`<option value="${p.id}">${p.ip}${p.name?` (${p.name})`:''}</option>`)).join('')
-    : '<option value="__none__" selected>无可用IPv4</option>'
+    ? ['<option value="">自动分配IPv4</option>'].concat(p4.map(p=>`<option value="${p.id}">${p.ip}${p.name?` (${p.name})`:''}</option>`)).join('')
+    : '<option value="__none__" selected>无可用IPv4</option><option value="">自动分配IPv4</option>'
   byId('c_primary_ip').disabled = false
   byId('c_primary_ip').value = p4.length ? '' : '__none__'
 
   byId('c_primary_ipv6').innerHTML = p6.length
-    ? ['<option value="">请选择已有IPv6（可选）</option>'].concat(p6.map(p=>`<option value="${p.id}">${p.ip}${p.name?` (${p.name})`:''}</option>`)).join('')
-    : '<option value="__none__" selected>无可用IPv6</option>'
+    ? ['<option value="">自动分配IPv6</option>'].concat(p6.map(p=>`<option value="${p.id}">${p.ip}${p.name?` (${p.name})`:''}</option>`)).join('')
+    : '<option value="__none__" selected>无可用IPv6</option><option value="">自动分配IPv6</option>'
   byId('c_primary_ipv6').disabled = false
   byId('c_primary_ipv6').value = p6.length ? '' : '__none__'
   byId('c_location').onchange=()=>{renderTypeOptions();showTypePrice()}
