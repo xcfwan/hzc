@@ -43,6 +43,29 @@ if [ "$LOCAL_AFTER" != "$REMOTE_HEAD" ]; then
 fi
 echo "[ok] 代码已对齐 origin/main: ${LOCAL_AFTER:0:7}"
 
+# Sync APP_VERSION in .env to repository default, avoid stale pinned old version
+TARGET_VERSION="$(python3 - <<'PY'
+import re
+from pathlib import Path
+p = Path('app/config.py')
+s = p.read_text(encoding='utf-8', errors='ignore')
+m = re.search(r'app_version\s*:\s*str\s*=\s*os\.getenv\("APP_VERSION",\s*"([0-9.]+)"\)', s)
+print(m.group(1) if m else "")
+PY
+)"
+if [ -n "$TARGET_VERSION" ]; then
+  if [ -f .env ]; then
+    if grep -q '^APP_VERSION=' .env; then
+      sed -i "s/^APP_VERSION=.*/APP_VERSION=${TARGET_VERSION}/" .env
+    else
+      echo "APP_VERSION=${TARGET_VERSION}" >> .env
+    fi
+  else
+    echo "APP_VERSION=${TARGET_VERSION}" > .env
+  fi
+  echo "[i] 已同步 .env APP_VERSION=${TARGET_VERSION}"
+fi
+
 echo "[i] 重建并更新容器..."
 $COMPOSE_CMD up -d --build
 
