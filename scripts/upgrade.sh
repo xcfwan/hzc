@@ -49,15 +49,26 @@ $COMPOSE_CMD up -d --build
 echo "[i] 健康检查 /api/meta ..."
 APP_META=""
 fetch_meta(){
+  # We are in helper container; 127.0.0.1 points to helper itself.
+  # So probe target service container via compose exec first.
+  if $COMPOSE_CMD exec -T hetzner-traffic-guard python3 - <<'PY' 2>/dev/null
+import urllib.request
+print(urllib.request.urlopen('http://127.0.0.1:1227/api/meta', timeout=3).read().decode('utf-8', 'ignore'))
+PY
+  then
+    return 0
+  fi
+
+  # fallback: try host-gateway alias when available
   if command -v curl >/dev/null 2>&1; then
-    curl -fsS "http://127.0.0.1:1227/api/meta" || true
+    curl -fsS "http://host.docker.internal:1227/api/meta" || true
   elif command -v wget >/dev/null 2>&1; then
-    wget -qO- "http://127.0.0.1:1227/api/meta" || true
+    wget -qO- "http://host.docker.internal:1227/api/meta" || true
   else
     python3 - <<'PY' || true
 import urllib.request
 try:
-    print(urllib.request.urlopen('http://127.0.0.1:1227/api/meta', timeout=3).read().decode('utf-8', 'ignore'))
+    print(urllib.request.urlopen('http://host.docker.internal:1227/api/meta', timeout=3).read().decode('utf-8', 'ignore'))
 except Exception:
     pass
 PY
