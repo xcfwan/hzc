@@ -145,18 +145,26 @@ class TelegramControl:
             # run upgrade in a dedicated helper container to avoid self-termination
             # image name may vary (hzc_... or hzc-...), so detect from running container first
             upgrade_cmd = (
-                "bash -lc 'mkdir -p /opt/hzc/state; "
+                "set -e; mkdir -p /opt/hzc/state; "
                 "IMG=$(docker inspect -f \"{{.Config.Image}}\" hetzner-traffic-guard 2>/dev/null || echo hzc_hetzner-traffic-guard:latest); "
-                "docker run -d --name hzc-upgrader-$(date +%s) --rm "
+                "CID=$(docker run -d --name hzc-upgrader-$(date +%s) --rm "
                 "-v /opt/hzc:/opt/hzc -v /var/run/docker.sock:/var/run/docker.sock "
-                "$IMG bash -lc \"cd /opt/hzc && ./scripts/upgrade.sh > /opt/hzc/state/upgrade.log 2>&1\"'"
+                "$IMG bash -lc \"cd /opt/hzc && ./scripts/upgrade.sh > /opt/hzc/state/upgrade.log 2>&1\"); "
+                "echo $CID"
             )
-            p = await asyncio.create_subprocess_shell(upgrade_cmd)
+            p = await asyncio.create_subprocess_shell(
+                f"bash -lc '{upgrade_cmd}'",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
             out, err = await p.communicate()
             if p.returncode != 0:
-                msg = (err.decode("utf-8", errors="ignore") if err else "")[-500:]
-                return await self.send(f"升级任务触发失败：{msg or 'unknown error'}", chat_id)
-            return await self.send("升级任务已触发。约30-90秒后生效。\n可点【🏷️ 版本号】确认。", chat_id)
+                so = (out.decode("utf-8", errors="ignore") if out else "").strip()
+                se = (err.decode("utf-8", errors="ignore") if err else "").strip()
+                msg = (se or so or "unknown error")[-700:]
+                return await self.send(f"升级任务触发失败：{msg}", chat_id)
+            cid = (out.decode("utf-8", errors="ignore") if out else "").strip()[:24]
+            return await self.send(f"升级任务已触发（task: {cid or 'n/a'}）。约30-90秒后生效。\n可点【🏷️ 版本号】或【📜 升级日志】确认。", chat_id)
 
         if cmd == "/upgradelog":
             p = await asyncio.create_subprocess_shell("bash -lc 'tail -n 80 /opt/hzc/state/upgrade.log 2>/dev/null || echo no-log'", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
