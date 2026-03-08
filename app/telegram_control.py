@@ -156,22 +156,12 @@ class TelegramControl:
                 "git fetch origin main >/dev/null 2>&1 || { echo '__FETCH_FAILED__'; exit 14; }; "
                 "LOCAL=$(git rev-parse HEAD 2>/dev/null || true); REMOTE=$(git rev-parse origin/main 2>/dev/null || true); "
                 "if [ -n \"$LOCAL\" ] && [ \"$LOCAL\" = \"$REMOTE\" ]; then echo '__UPGRADE_UPTODATE__'; exit 11; fi; "
-                "if docker ps --format \"{{.Names}}\" | grep -q '^hzc-upgrader-lock$'; then "
-                "  START_AT=$(docker inspect -f '{{.State.StartedAt}}' hzc-upgrader-lock 2>/dev/null || true); "
-                "  NOW=$(date +%s); START_TS=$(date -d \"$START_AT\" +%s 2>/dev/null || echo $NOW); "
-                "  AGE=$((NOW-START_TS)); "
-                "  if [ $AGE -gt 600 ]; then "
-                "    docker rm -f hzc-upgrader-lock >/dev/null 2>&1 || true; "
-                "    echo '__UPGRADE_STALE_LOCK_CLEARED__'; "
-                "  else "
-                "    echo '__UPGRADE_LOCKED__'; exit 12; "
-                "  fi; "
-                "fi; "
-                "docker rm -f hzc-upgrader-lock >/dev/null 2>&1 || true; "
                 "if command -v docker-compose >/dev/null 2>&1; then "
-                "  CID=$(docker-compose run -d --name hzc-upgrader-lock --no-deps --entrypoint bash hetzner-traffic-guard -lc \"cd /opt/hzc && timeout 1800 ./scripts/upgrade.sh > /opt/hzc/state/upgrade.log 2>&1 || true\"); "
+                "  TASK_NAME=hzc-upgrader-$(date +%s); "
+                "  CID=$(docker-compose run -d --rm --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"cd /opt/hzc && timeout 1800 ./scripts/upgrade.sh > /opt/hzc/state/upgrade.log 2>&1 || true\"); "
                 "elif docker compose version >/dev/null 2>&1; then "
-                "  CID=$(docker compose run -d --name hzc-upgrader-lock --no-deps --entrypoint bash hetzner-traffic-guard -lc \"cd /opt/hzc && timeout 1800 ./scripts/upgrade.sh > /opt/hzc/state/upgrade.log 2>&1 || true\"); "
+                "  TASK_NAME=hzc-upgrader-$(date +%s); "
+                "  CID=$(docker compose run -d --rm --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"cd /opt/hzc && timeout 1800 ./scripts/upgrade.sh > /opt/hzc/state/upgrade.log 2>&1 || true\"); "
                 "else echo '__NO_COMPOSE__'; exit 13; fi; "
                 "echo $CID"
             )
@@ -186,8 +176,6 @@ class TelegramControl:
             if p.returncode != 0:
                 if "__UPGRADE_UPTODATE__" in so:
                     return await self.send("当前已是最新版本，无需升级。", chat_id)
-                if "__UPGRADE_LOCKED__" in so:
-                    return await self.send("已有升级任务正在执行，请稍后查看【📜 升级日志】（超过10分钟会自动清理旧锁）。", chat_id)
                 if "__NO_COMPOSE__" in so:
                     return await self.send("升级任务触发失败：未检测到 docker compose / docker-compose", chat_id)
                 if "__FETCH_FAILED__" in so:
@@ -197,8 +185,7 @@ class TelegramControl:
 
             self.runtime.update({"last_upgrade_trigger_ts": now})
             cid = (out.decode("utf-8", errors="ignore") if out else "").strip().splitlines()[-1][:24]
-            extra = "（检测到旧锁并已自动清理）\n" if "__UPGRADE_STALE_LOCK_CLEARED__" in so else ""
-            return await self.send(f"开始执行一键升级（拉取最新代码并重建容器）...\n{extra}升级任务已触发（task: {cid or 'n/a'}）。约30-120秒后生效。\n可点【🏷️ 版本号】或【📜 升级日志】确认。", chat_id)
+            return await self.send(f"开始执行一键升级（拉取最新代码并重建容器）...\n升级任务已触发（task: {cid or 'n/a'}）。约30-120秒后生效。\n可点【🏷️ 版本号】或【📜 升级日志】确认。", chat_id)
 
         if cmd == "/upgradelog":
             if len(parts) >= 2 and parts[1].lower() == "full":
