@@ -142,25 +142,32 @@ class TelegramControl:
             return await self.send(f"当前版本: {settings.app_version}\n提交: {settings.app_commit}", chat_id)
 
         if cmd == "/upgrade":
-            # prevent duplicate trigger caused by container restart / repeated delivery in short time
+            # prevent duplicate trigger caused by repeated delivery in short time
             now = int(time.time())
             rc = self.runtime.get()
             last_ts = int(rc.get("last_upgrade_trigger_ts") or 0)
-            if now - last_ts < 45:
-                return await self.send("已有升级任务刚触发，请勿重复点击（45秒内防抖）", chat_id)
-            self.runtime.update({"last_upgrade_trigger_ts": now})
+            if now - last_ts < 25:
+                return await self.send("已有升级请求刚触发，请勿重复点击（25秒内防抖）", chat_id)
 
-            await self.send("开始执行一键升级（拉取最新代码并重建容器）...", chat_id)
-            # run upgrade in helper container with a fixed lock name to prevent duplicate concurrent triggers
+            # run upgrade in helper container with a fixed lock name
+            # stale running lock (>30min) will be force cleaned automatically
             upgrade_cmd = (
                 "set -e; mkdir -p /opt/hzc/state; cd /opt/hzc; "
                 "if docker ps --format \"{{.Names}}\" | grep -q '^hzc-upgrader-lock$'; then "
-                "  echo '__UPGRADE_LOCKED__'; exit 12; "
+                "  START_AT=$(docker inspect -f '{{.State.StartedAt}}' hzc-upgrader-lock 2>/dev/null || true); "
+                "  NOW=$(date +%s); START_TS=$(date -d \"$START_AT\" +%s 2>/dev/null || echo $NOW); "
+                "  AGE=$((NOW-START_TS)); "
+                "  if [ $AGE -gt 1800 ]; then "
+                "    docker rm -f hzc-upgrader-lock >/dev/null 2>&1 || true; "
+                "    echo '__UPGRADE_STALE_LOCK_CLEARED__'; "
+                "  else "
+                "    echo '__UPGRADE_LOCKED__'; exit 12; "
+                "  fi; "
                 "fi; "
                 "docker rm -f hzc-upgrader-lock >/dev/null 2>&1 || true; "
                 "CID=$(docker-compose run -d --name hzc-upgrader-lock --no-deps "
                 "--entrypoint bash hetzner-traffic-guard "
-                "-lc \"cd /opt/hzc && ./scripts/upgrade.sh > /opt/hzc/state/upgrade.log 2>&1\"); "
+                "-lc \"cd /opt/hzc && timeout 1800 ./scripts/upgrade.sh > /opt/hzc/state/upgrade.log 2>&1 || true\"); "
                 "echo $CID"
             )
             p = await asyncio.create_subprocess_shell(
@@ -176,8 +183,11 @@ class TelegramControl:
                     return await self.send("已有升级任务正在执行，请稍后查看【📜 升级日志】。", chat_id)
                 msg = (se or so or "unknown error")[-700:]
                 return await self.send(f"升级任务触发失败：{msg}", chat_id)
-            cid = (out.decode("utf-8", errors="ignore") if out else "").strip()[:24]
-            return await self.send(f"升级任务已触发（task: {cid or 'n/a'}）。约30-90秒后生效。\n可点【🏷️ 版本号】或【📜 升级日志】确认。", chat_id)
+
+            self.runtime.update({"last_upgrade_trigger_ts": now})
+            cid = (out.decode("utf-8", errors="ignore") if out else "").strip().splitlines()[-1][:24]
+            extra = "（检测到旧锁并已自动清理）\n" if "__UPGRADE_STALE_LOCK_CLEARED__" in so else ""
+            return await self.send(f"开始执行一键升级（拉取最新代码并重建容器）...\n{extra}升级任务已触发（task: {cid or 'n/a'}）。约30-120秒后生效。\n可点【🏷️ 版本号】或【📜 升级日志】确认。", chat_id)
 
         if cmd == "/upgradelog":
             if len(parts) >= 2 and parts[1].lower() == "full":
