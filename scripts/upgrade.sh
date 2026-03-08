@@ -69,7 +69,7 @@ fi
 echo "[i] 重建并更新容器..."
 $COMPOSE_CMD up -d --build
 
-echo "[i] 健康检查 /api/meta ..."
+echo "[i] 健康检查 /api/ping ..."
 APP_META=""
 LAST_ERR=""
 fetch_meta(){
@@ -78,7 +78,7 @@ fetch_meta(){
   if OUT="$($COMPOSE_CMD exec -T hetzner-traffic-guard python3 - <<'PY' 2>/dev/null
 import urllib.request
 try:
-    print(urllib.request.urlopen('http://127.0.0.1:1227/api/meta', timeout=4).read().decode('utf-8', 'ignore'))
+    print(urllib.request.urlopen('http://127.0.0.1:1227/api/ping', timeout=4).read().decode('utf-8', 'ignore'))
 except Exception as e:
     print(f"__ERR__:{e}")
 PY
@@ -89,14 +89,14 @@ PY
 
   # fallback: try host-gateway alias when available
   if command -v curl >/dev/null 2>&1; then
-    curl -fsS --connect-timeout 4 --max-time 5 "http://host.docker.internal:1227/api/meta" || true
+    curl -fsS --connect-timeout 4 --max-time 5 "http://host.docker.internal:1227/api/ping" || true
   elif command -v wget >/dev/null 2>&1; then
-    wget -qO- --timeout=5 "http://host.docker.internal:1227/api/meta" || true
+    wget -qO- --timeout=5 "http://host.docker.internal:1227/api/ping" || true
   else
     python3 - <<'PY' || true
 import urllib.request
 try:
-    print(urllib.request.urlopen('http://host.docker.internal:1227/api/meta', timeout=4).read().decode('utf-8', 'ignore'))
+    print(urllib.request.urlopen('http://host.docker.internal:1227/api/ping', timeout=4).read().decode('utf-8', 'ignore'))
 except Exception as e:
     print(f"__ERR__:{e}")
 PY
@@ -115,7 +115,7 @@ for i in $(seq 1 45); do
 done
 
 if [ -z "$APP_META" ]; then
-  echo "[x] 升级后健康检查失败：/api/meta 无响应"
+  echo "[x] 升级后健康检查失败：/api/ping 无响应"
   [ -n "$LAST_ERR" ] && echo "[x] 最近探测结果: $(echo "$LAST_ERR" | tail -n 1)"
   $COMPOSE_CMD ps || true
   $COMPOSE_CMD logs --tail=40 hetzner-traffic-guard || true

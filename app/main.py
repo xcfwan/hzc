@@ -108,6 +108,11 @@ async def servers():
     return await monitor.collect()
 
 
+@app.get('/api/ping')
+async def ping():
+    return {"ok": True, "app_version": settings.app_version, "app_commit": settings.app_commit}
+
+
 @app.get('/api/meta')
 async def meta():
     if not settings.hetzner_token:

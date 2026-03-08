@@ -214,7 +214,7 @@ class TelegramControl:
 
             status = "✅ 成功" if "[ok] 升级完成" in txt else "⚠️ 未确认成功"
             head_line = pick("代码已对齐 origin/main")
-            health_ok = "是" if "[i] 健康检查 /api/meta ..." in txt and "[x] 升级后健康检查失败" not in txt else "否"
+            health_ok = "是" if "[i] 健康检查 /api/ping ..." in txt and "[x] 升级后健康检查失败" not in txt else "否"
             fail_line = pick("[x]")
             ps_line = pick("hetzner-traffic-guard")
             msg = (
