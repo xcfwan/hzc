@@ -7,6 +7,9 @@ services:
       - "1227:1227"
     env_file:
       - .env
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     volumes:
       - ./state:/app/state
       - ./:/opt/hzc
