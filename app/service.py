@@ -337,7 +337,7 @@ class MonitorService:
             created["password_reset"] = rp
         return created
 
-    async def delete_server_manual(self, server_id: int, create_snapshot: bool = False, keep_ipv4: bool = False, keep_ipv6: bool = False):
+    async def delete_server_manual(self, server_id: int, create_snapshot: bool = False, keep_ipv4: bool = False, keep_ipv6: bool = False, keep_mode: str = "safe"):
         srv = await self.client.get_server(server_id)
         if not srv:
             return {"ok": False, "error": "server not found"}

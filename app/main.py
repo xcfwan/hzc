@@ -67,6 +67,7 @@ class DeleteServerReq(BaseModel):
     create_snapshot: bool = False
     keep_ipv4: bool = False
     keep_ipv6: bool = False
+    keep_mode: str = "safe"  # safe|fast
 
 
 class TelegramConfigReq(BaseModel):
@@ -291,6 +292,7 @@ async def delete_server(server_id: int, req: DeleteServerReq):
         create_snapshot=req.create_snapshot,
         keep_ipv4=req.keep_ipv4,
         keep_ipv6=req.keep_ipv6,
+        keep_mode=req.keep_mode,
     )
 
 
