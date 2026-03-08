@@ -119,16 +119,20 @@ function rowHtml(r){
   const usedCell = `<div class="ratio-text">${usedPct.toFixed(1)}%</div><div class="progress progress-mini" title="${usedPct.toFixed(1)}%"><div class="bar" style="width:${usedPct}%;background:hsl(${hue} 85% 50%)"></div></div><div class="daily-mini">${formatTBPrecise(r.used_tb)} / ${formatTBPrecise(r.limit_tb)}</div>`
   const qbCell = qbCellHtml(q)
 
+  const ipText = (r.ip||'').trim()
+  const ipCell = ipText ? `<span class='copy-ip' title='点击复制IP' onclick="copyText('${ipText}')">${ipText}</span>` : ''
+
   return `<tr data-id="${r.id}">
     <td><span title="点击复制ID" onclick="copyText('${r.id}')" style="cursor:pointer">${r.id}</span></td>
     <td><span class='name-wrap'>${r.name}</span><button class='icon-btn' title='修改名称' onclick="renameServer(${r.id}, '${(r.name||'').replace(/'/g,"\\'")}')">✎</button></td>
     <td>${r.server_type || '-'} · ${r.cores||0}C/${r.memory_gb||0}GB/${r.disk_gb||0}GB</td>
-    <td>${r.ip||''}</td>
+    <td>${ipCell}</td>
     <td><span class="badge ${r.status==='running'?'running':'other'}">${r.status}</span></td>
     <td class="qb-cell" data-id="${r.id}">${qbCell}</td>
     <td>${usedCell}</td><td>${todayCell}</td>
     <td><div class="op-row">
       <button class="btn action" onclick="openQBModal(${r.id})">配置qB</button>
+      <button class="btn action" onclick="openQBWeb(${r.id}, '${ipText}')">打开qB</button>
       <button class="${policyBtnClass}" onclick="openAutoPolicyModal(${r.id})" title="${policyLabel}">${policyLabel}</button>
       <button class="btn action" onclick="rebootServer(${r.id})">重启</button>
       <button class="btn action" onclick="hardRebootServer(${r.id})">强制重启</button>
@@ -197,6 +201,22 @@ async function copyText(v){
     window.prompt('当前环境限制自动复制，请手动复制：', text)
     toast('已打开手动复制框')
   }
+}
+
+function openQBWeb(serverId, ip){
+  const sid=String(serverId)
+  const conf=QB_NODES?.[sid]||{}
+  let url=(conf.url||'').trim()
+  if(!url){
+    const host=(ip||'').trim()
+    if(!host){
+      toast('无可用IP，无法打开qB')
+      return
+    }
+    url=`http://${host}:8080`
+  }
+  if(!/^https?:\/\//i.test(url)) url=`http://${url}`
+  window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 function typeFamily(name=''){return name.replace(/[0-9].*$/,'')}
