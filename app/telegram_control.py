@@ -154,9 +154,10 @@ class TelegramControl:
             # run upgrade in helper container with a fixed lock name to prevent duplicate concurrent triggers
             upgrade_cmd = (
                 "set -e; mkdir -p /opt/hzc/state; cd /opt/hzc; "
-                "if docker ps -a --format \"{{.Names}}\" | grep -q '^hzc-upgrader-lock$'; then "
+                "if docker ps --format \"{{.Names}}\" | grep -q '^hzc-upgrader-lock$'; then "
                 "  echo '__UPGRADE_LOCKED__'; exit 12; "
                 "fi; "
+                "docker rm -f hzc-upgrader-lock >/dev/null 2>&1 || true; "
                 "CID=$(docker-compose run -d --name hzc-upgrader-lock --no-deps "
                 "--entrypoint bash hetzner-traffic-guard "
                 "-lc \"cd /opt/hzc && ./scripts/upgrade.sh > /opt/hzc/state/upgrade.log 2>&1\"); "
