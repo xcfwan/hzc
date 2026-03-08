@@ -157,7 +157,7 @@ class TelegramControl:
                 "  START_AT=$(docker inspect -f '{{.State.StartedAt}}' hzc-upgrader-lock 2>/dev/null || true); "
                 "  NOW=$(date +%s); START_TS=$(date -d \"$START_AT\" +%s 2>/dev/null || echo $NOW); "
                 "  AGE=$((NOW-START_TS)); "
-                "  if [ $AGE -gt 1800 ]; then "
+                "  if [ $AGE -gt 600 ]; then "
                 "    docker rm -f hzc-upgrader-lock >/dev/null 2>&1 || true; "
                 "    echo '__UPGRADE_STALE_LOCK_CLEARED__'; "
                 "  else "
@@ -182,8 +182,8 @@ class TelegramControl:
             so = (out.decode("utf-8", errors="ignore") if out else "").strip()
             se = (err.decode("utf-8", errors="ignore") if err else "").strip()
             if p.returncode != 0:
-                if "__UPGRADE_LOCKED__" in so or "hzc-upgrader-lock" in se:
-                    return await self.send("已有升级任务正在执行，请稍后查看【📜 升级日志】。", chat_id)
+                if "__UPGRADE_LOCKED__" in so:
+                    return await self.send("已有升级任务正在执行，请稍后查看【📜 升级日志】（超过10分钟会自动清理旧锁）。", chat_id)
                 if "__NO_COMPOSE__" in so:
                     return await self.send("升级任务触发失败：未检测到 docker compose / docker-compose", chat_id)
                 msg = (se or so or "unknown error")[-700:]
