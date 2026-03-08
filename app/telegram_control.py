@@ -320,21 +320,33 @@ class TelegramControl:
     async def run(self):
         if not self.enabled:
             return
-        await self.set_menu()
-        # keep startup ping as requested
-        p = await asyncio.create_subprocess_shell("bash -lc 'hostname'", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-        out, _ = await p.communicate()
-        host = (out.decode("utf-8", errors="ignore").strip() if out else "-")
-        await self.send(f"🤖 Hetzner Monitor 机器人已启动（{host}），发送 /start 查看命令", reply_markup=self.main_keyboard())
+        initialized = False
+        host = '-'
         while True:
             try:
+                if not initialized:
+                    try:
+                        await self.set_menu()
+                    except Exception:
+                        pass
+                    try:
+                        p = await asyncio.create_subprocess_shell("bash -lc 'hostname'", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                        out, _ = await p.communicate()
+                        host = (out.decode("utf-8", errors="ignore").strip() if out else "-")
+                    except Exception:
+                        host = '-'
+                    try:
+                        await self.send(f"🤖 Hetzner Monitor 机器人已启动（{host}），发送 /start 查看命令", reply_markup=self.main_keyboard())
+                    except Exception:
+                        pass
+                    initialized = True
+
                 async with httpx.AsyncClient(timeout=60) as c:
                     r = await c.get(f"{BASE}/bot{self.token}/getUpdates", params={"timeout": 30, "offset": self.offset})
                     r.raise_for_status()
                     data = r.json().get("result", [])
                 for u in data:
                     self.offset = u["update_id"] + 1
-                    # persist offset to avoid duplicate command replay after restart
                     self.runtime.update({"telegram_update_offset": self.offset})
                     msg = u.get("message", {})
                     chat_id = str(msg.get("chat", {}).get("id", ""))
@@ -342,5 +354,9 @@ class TelegramControl:
                     if chat_id and chat_id == self.chat_id:
                         await self.handle(text, chat_id)
                 await asyncio.sleep(1)
-            except Exception:
+            except Exception as e:
+                try:
+                    print(f"[tg-loop] recoverable error: {e}")
+                except Exception:
+                    pass
                 await asyncio.sleep(3)
