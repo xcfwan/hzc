@@ -1,8 +1,16 @@
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import os
+import subprocess
 
 load_dotenv()
+
+
+def detect_git_commit_short() -> str:
+    try:
+        return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], text=True).strip()
+    except Exception:
+        return "unknown"
 
 
 class Settings(BaseModel):
@@ -19,7 +27,8 @@ class Settings(BaseModel):
     qb_username: str = os.getenv("QB_USERNAME", "")
     qb_password: str = os.getenv("QB_PASSWORD", "")
     qb_store_path: str = os.getenv("QB_STORE_PATH", "/app/state/qb_nodes.json")
-    app_version: str = os.getenv("APP_VERSION", "26.3.59")
+    app_version: str = os.getenv("APP_VERSION", "26.3.60")
+    app_commit: str = os.getenv("APP_COMMIT", detect_git_commit_short())
     runtime_config_path: str = os.getenv("RUNTIME_CONFIG_PATH", "/app/state/runtime_config.json")
     auto_policy_path: str = os.getenv("AUTO_POLICY_PATH", "/app/state/auto_policies.json")
 

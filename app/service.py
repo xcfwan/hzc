@@ -56,6 +56,7 @@ class MonitorService:
 
         return {
             "app_version": settings.app_version,
+            "app_commit": settings.app_commit,
             "server_types": [
                 {
                     "name": t.get("name"),

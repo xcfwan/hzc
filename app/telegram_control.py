@@ -139,7 +139,7 @@ class TelegramControl:
             return await self.send(f"本月总出流量: {total:.2f} TB", chat_id)
 
         if cmd == "/version":
-            return await self.send(f"当前版本: {settings.app_version}", chat_id)
+            return await self.send(f"当前版本: {settings.app_version}\n提交: {settings.app_commit}", chat_id)
 
         if cmd == "/upgrade":
             # prevent duplicate trigger caused by container restart / repeated delivery in short time
