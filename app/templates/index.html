@@ -124,11 +124,11 @@
         <label>选择镜像/快照<select id="rebuild_snapshot"></select></label>
       </div>
       <div class="hint" style="margin-top:8px">说明：
-        ①确认重建 = 原地重建（保留IP）
+        ①确认重建 = 删除旧机后保留原IP创建新机（可重置流量）
         ②完全重建(换IP) = 新建后删旧，获得新IP
       </div>
       <div class="modal-actions">
-        <button class="btn btn-danger" onclick="submitRebuild()">确认重建（保留IP）</button>
+        <button class="btn btn-danger" onclick="submitRebuild()">确认重建（保留IP重建新机）</button>
         <button class="btn btn-danger" onclick="submitFullRebuild()">完全重建（换IP）</button>
         <button class="btn" onclick="closeRebuildModal()">取消</button>
       </div>
@@ -138,11 +138,11 @@
   <div id="deleteModal" class="modal hidden">
     <div class="modal-card glass">
       <h3>删除服务器</h3>
-      <div class="grid">
+      <div class="grid delete-grid">
         <label>服务器ID<input id="del_server_id" readonly /></label>
-        <label><input id="del_make_snapshot" type="checkbox" /> 删除前创建快照</label>
-        <label><input id="del_keep_ipv4" type="checkbox" /> 保留IPv4</label>
-        <label><input id="del_keep_ipv6" type="checkbox" /> 保留IPv6</label>
+        <label class="checkline"><input id="del_make_snapshot" type="checkbox" /> 删除前创建快照</label>
+        <label class="checkline"><input id="del_keep_ipv4" type="checkbox" /> 保留IPv4</label>
+        <label class="checkline"><input id="del_keep_ipv6" type="checkbox" /> 保留IPv6</label>
         <label>保留IP模式
           <select id="del_keep_mode">
             <option value="safe">标准模式（关机+解绑再删机，更稳）</option>
@@ -184,7 +184,7 @@
         <label>阈值(0~1)<input id="ap_threshold" type="number" step="0.01" min="0.01" max="1" value="0.95" /></label>
         <label>达到阈值使用快照<select id="ap_image_id"></select></label>
       </div>
-      <div class="hint" style="margin-top:8px">示例：0.95 表示达到 95% 时自动按所选快照原地重建（保留IP）。</div>
+      <div class="hint" style="margin-top:8px">示例：0.95 表示达到 95% 时自动删除旧机并保留原IP重建新机（重置流量）。</div>
       <div class="modal-actions">
         <button class="btn primary" onclick="saveAutoPolicy()">保存策略</button>
         <button class="btn" onclick="deleteAutoPolicy()">删除策略</button>

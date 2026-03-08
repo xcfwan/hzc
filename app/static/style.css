@@ -37,6 +37,8 @@ body{margin:0;color:var(--text);background:var(--bg);font-family:Inter,Arial,san
 .badge-traffic{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:999px;font-size:11px;margin-left:6px}.badge-warn{background:#3b2d12;color:#f9ca7a}.badge-crit{background:#4a1f27;color:#ff9cab}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:12px;z-index:20}.hidden{display:none}
 .modal-card{width:min(760px,96vw);padding:14px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.grid label{display:flex;flex-direction:column;gap:6px;min-width:0;font-size:13px}.grid input,.grid select{height:40px;width:100%;padding:0 10px;background:transparent;border:1px solid var(--line);border-radius:10px;color:var(--text)}
+.delete-grid .checkline{flex-direction:row;align-items:center;gap:8px}
+.delete-grid .checkline input[type="checkbox"]{width:14px;height:14px;padding:0;border:1px solid var(--line);border-radius:4px;accent-color:var(--blue);flex:0 0 auto}
 .modal-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .stock-ok{color:var(--green)}.stock-warn{color:var(--orange)}.stock-bad{color:var(--red)}
 .toast{position:fixed;right:16px;bottom:16px;padding:12px 14px;border-radius:10px;background:#111b3f;border:1px solid #3d56a7;color:#fff;z-index:30;box-shadow:0 8px 30px #00000052}
