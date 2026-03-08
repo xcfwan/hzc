@@ -153,6 +153,9 @@ class TelegramControl:
             # stale running lock (>30min) will be force cleaned automatically
             upgrade_cmd = (
                 "set -e; mkdir -p /opt/hzc/state; cd /opt/hzc; "
+                "git fetch origin main >/dev/null 2>&1 || { echo '__FETCH_FAILED__'; exit 14; }; "
+                "LOCAL=$(git rev-parse HEAD 2>/dev/null || true); REMOTE=$(git rev-parse origin/main 2>/dev/null || true); "
+                "if [ -n \"$LOCAL\" ] && [ \"$LOCAL\" = \"$REMOTE\" ]; then echo '__UPGRADE_UPTODATE__'; exit 11; fi; "
                 "if docker ps --format \"{{.Names}}\" | grep -q '^hzc-upgrader-lock$'; then "
                 "  START_AT=$(docker inspect -f '{{.State.StartedAt}}' hzc-upgrader-lock 2>/dev/null || true); "
                 "  NOW=$(date +%s); START_TS=$(date -d \"$START_AT\" +%s 2>/dev/null || echo $NOW); "
@@ -182,10 +185,14 @@ class TelegramControl:
             so = (out.decode("utf-8", errors="ignore") if out else "").strip()
             se = (err.decode("utf-8", errors="ignore") if err else "").strip()
             if p.returncode != 0:
+                if "__UPGRADE_UPTODATE__" in so:
+                    return await self.send("当前已是最新版本，无需升级。", chat_id)
                 if "__UPGRADE_LOCKED__" in so:
                     return await self.send("已有升级任务正在执行，请稍后查看【📜 升级日志】（超过10分钟会自动清理旧锁）。", chat_id)
                 if "__NO_COMPOSE__" in so:
                     return await self.send("升级任务触发失败：未检测到 docker compose / docker-compose", chat_id)
+                if "__FETCH_FAILED__" in so:
+                    return await self.send("升级任务触发失败：拉取远端版本信息失败，请稍后重试。", chat_id)
                 msg = (se or so or "unknown error")[-700:]
                 return await self.send(f"升级任务触发失败：{msg}", chat_id)
 
