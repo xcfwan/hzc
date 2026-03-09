@@ -538,7 +538,70 @@ async function saveTGConfig(restartAfter=false){
   }
   closeTGModal()
 }
-async function submitCreate(){const v4=byId('c_primary_ip').value,v6=byId('c_primary_ipv6').value;const body={name:byId('c_name').value||`srv-${Date.now()}`,server_type:byId('c_type').value,location:byId('c_location').value,image:byId('c_image').value,primary_ip_id: (v4 && v4!=='__none__') ? Number(v4) : null,primary_ipv6_id: (v6 && v6!=='__none__') ? Number(v6) : null};const r=await fetch('/api/create_server',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}),d=await r.json();if(!r.ok){alert(d?.detail||d?.error||'创建失败');return}toast('创建任务已提交');closeCreateModal();loadData()}
+let CREATING_SERVER = false
+async function submitCreate(){
+  if(CREATING_SERVER){
+    toast('创建进行中，请稍候...')
+    return
+  }
+
+  const btn = Array.from(document.querySelectorAll('#createModal .modal-actions .btn.primary'))[0]
+  const prevText = btn ? btn.textContent : '创建'
+
+  const name=(byId('c_name').value||`srv-${Date.now()}`).trim()
+  const serverType=(byId('c_type').value||'').trim()
+  const location=(byId('c_location').value||'').trim()
+  const image=(byId('c_image').value||'').trim()
+  const v4=byId('c_primary_ip').value
+  const v6=byId('c_primary_ipv6').value
+
+  if(!serverType){ alert('请选择服务器型号'); return }
+  if(!location){ alert('请选择机房'); return }
+  if(!image){ alert('请选择镜像/快照'); return }
+
+  const body={
+    name,
+    server_type:serverType,
+    location,
+    image,
+    primary_ip_id: (v4 && v4!=='__none__') ? Number(v4) : null,
+    primary_ipv6_id: (v6 && v6!=='__none__') ? Number(v6) : null
+  }
+
+  CREATING_SERVER = true
+  if(btn){ btn.disabled=true; btn.textContent='创建中...' }
+
+  try{
+    const r=await fetch('/api/create_server',{
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify(body)
+    })
+
+    let d=null
+    const ct=(r.headers.get('content-type')||'').toLowerCase()
+    if(ct.includes('application/json')){
+      d=await r.json()
+    }else{
+      const t=await r.text()
+      d={error:t}
+    }
+
+    if(!r.ok || !d?.server){
+      alert(d?.detail||d?.error||`创建失败（HTTP ${r.status}）`)
+      return
+    }
+
+    toast('创建任务已提交')
+    closeCreateModal()
+    loadData()
+  }catch(e){
+    alert(`创建请求失败：${e?.message||e}`)
+  }finally{
+    CREATING_SERVER = false
+    if(btn){ btn.disabled=false; btn.textContent=prevText }
+  }
+}
 
 function openSnapshotsModal(){
   byId('snapshotsModal').classList.remove('hidden')
