@@ -215,6 +215,12 @@ class HetznerClient:
             r.raise_for_status()
             return True
 
+    async def delete_primary_ip(self, primary_ip_id: int):
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.delete(f"{BASE}/primary_ips/{primary_ip_id}", headers=self.headers)
+            r.raise_for_status()
+            return True
+
     async def update_snapshot_description(self, image_id: int, description: str):
         payload = {"description": description}
         async with httpx.AsyncClient(timeout=30) as c:

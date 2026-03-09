@@ -437,6 +437,9 @@ class MonitorService:
         ipv6_id = ((net.get("ipv6") or {}).get("id"))
 
         kept = {"ipv4": None, "ipv6": None}
+        deleted_primary_ips = {"ipv4": None, "ipv6": None}
+
+        # 勾选保留：先解绑并保留资源；未勾选：删除服务器后删除Primary IP资源
         if keep_ipv4 and ipv4_id:
             await self.client.unassign_primary_ip(int(ipv4_id))
             kept["ipv4"] = int(ipv4_id)
@@ -445,10 +448,21 @@ class MonitorService:
             kept["ipv6"] = int(ipv6_id)
 
         await self.client.delete_server(server_id)
+
+        if (not keep_ipv4) and ipv4_id:
+            await self.client.delete_primary_ip(int(ipv4_id))
+            deleted_primary_ips["ipv4"] = int(ipv4_id)
+        if (not keep_ipv6) and ipv6_id:
+            await self.client.delete_primary_ip(int(ipv6_id))
+            deleted_primary_ips["ipv6"] = int(ipv6_id)
+
         await self.tg.send(
             f"🗑️ 服务器已删除\nID: {server_id}\n名称: {srv.get('name','-')}\n"
             f"快照: {'已创建' if create_snapshot else '未创建'}{f' ({snapshot_name})' if snapshot_name else ''}\n"
-            f"保留IPv4: {'是' if bool(kept['ipv4']) else '否'}\n保留IPv6: {'是' if bool(kept['ipv6']) else '否'}"
+            f"保留IPv4: {'是' if bool(kept['ipv4']) else '否'}\n"
+            f"保留IPv6: {'是' if bool(kept['ipv6']) else '否'}\n"
+            f"已删除Primary IPv4: {'是' if bool(deleted_primary_ips['ipv4']) else '否'}\n"
+            f"已删除Primary IPv6: {'是' if bool(deleted_primary_ips['ipv6']) else '否'}"
         )
         return {
             "ok": True,
@@ -456,6 +470,7 @@ class MonitorService:
             "snapshot_created": bool(create_snapshot),
             "snapshot_name": snapshot_name,
             "kept_primary_ip_ids": kept,
+            "deleted_primary_ip_ids": deleted_primary_ips,
         }
 
     async def delete_snapshot_manual(self, image_id: int):
