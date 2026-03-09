@@ -460,13 +460,13 @@ async function submitRebuild(){
   const sid=Number(byId('rebuild_server_id').value)
   const imageId=byId('rebuild_snapshot').value
   if(!imageId){alert('请先选择镜像或快照');return}
-  if(!confirm(`二次确认：将使用 ${imageId} 原地重建服务器 ${sid}（保留IP），继续吗？`)) return
+  if(!confirm(`二次确认：将删除旧服务器 ${sid}，并使用原IP创建同配置新服务器（镜像/快照: ${imageId}），继续吗？`)) return
   const verify = prompt('请输入 REBUILD 确认执行：','')
   if((verify||'').trim().toUpperCase() !== 'REBUILD'){ alert('未确认，已取消'); return }
   const r=await fetch(`/api/rebuild/${sid}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({image_id:imageId})})
   const d=await r.json()
   if(!r.ok||!d?.ok){alert(d?.detail||d?.error||'重建失败');return}
-  toast('重建任务已提交（原地重建，保留IP）')
+  toast('重建已提交：删除旧机并用原IP创建同配置新机')
   closeRebuildModal(); loadAll(false)
 }
 

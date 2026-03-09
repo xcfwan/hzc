@@ -444,7 +444,7 @@ class MonitorService:
             return await self.client.server_action(server_id, 'reboot')
         if cmd == 'rebuild':
             image = extra or 'debian-12'
-            return await self.client.server_action(server_id, 'rebuild', {'image': image})
+            return await self.rebuild_with_snapshot_manual(server_id, image)
         if cmd == 'delete':
             return {'ok': await self.client.delete_server(server_id)}
         return {'ok': False, 'error': 'unsupported cmd'}
@@ -464,11 +464,62 @@ class MonitorService:
         }
 
     async def rebuild_with_snapshot_manual(self, server_id: int, image_id):
-        # Rebuild in-place: keep same server object (and public IP), image can be snapshot_id or official image name
+        # Rebuild by replacing server while keeping original Primary IP(s):
+        # 1) unassign old server's primary IP(s)
+        # 2) delete old server
+        # 3) create new server with same config + original primary IP(s)
+        srv = await self.client.get_server(server_id)
+        if not srv:
+            return {"ok": False, "error": "server not found"}
+
         image = int(image_id) if str(image_id).isdigit() else str(image_id)
-        res = await self.client.server_action(server_id, 'rebuild', {'image': image})
-        await self.tg.send(f"♻️ 重建已提交\n服务器ID: {server_id}\n镜像/快照: {image}\n说明: 原地重建，保留原服务器IP")
-        return {"ok": True, "server_id": server_id, "image_id": image, "action": res.get("action", res)}
+
+        name = srv.get("name", f"server-{server_id}")
+        server_type = (srv.get("server_type") or {}).get("name")
+        location = ((srv.get("datacenter") or {}).get("location") or {}).get("name")
+        if not server_type or not location:
+            return {"ok": False, "error": "missing source server type/location"}
+
+        net = srv.get("public_net") or {}
+        ipv4_id = ((net.get("ipv4") or {}).get("id"))
+        ipv6_id = ((net.get("ipv6") or {}).get("id"))
+
+        if ipv4_id:
+            await self.client.unassign_primary_ip(int(ipv4_id))
+        if ipv6_id:
+            await self.client.unassign_primary_ip(int(ipv6_id))
+
+        await self.client.delete_server(server_id)
+
+        created = await self.client.create_server(
+            name=name,
+            server_type=server_type,
+            location=location,
+            image=image,
+            primary_ip_id=int(ipv4_id) if ipv4_id else None,
+            primary_ipv6_id=int(ipv6_id) if ipv6_id else None,
+        )
+
+        new_srv = created.get("server", {})
+        await self.tg.send(
+            f"♻️ 重建已完成（重置流量）\n"
+            f"旧服务器ID: {server_id}\n"
+            f"新服务器ID: {new_srv.get('id')}\n"
+            f"IPv4: {new_srv.get('public_net',{}).get('ipv4',{}).get('ip','-')}\n"
+            f"镜像/快照: {image}\n"
+            f"说明: 已删除旧机，并使用原Primary IP创建同配置新机"
+        )
+
+        return {
+            "ok": True,
+            "old_server_id": server_id,
+            "new_server": new_srv,
+            "image_id": image,
+            "kept_primary_ip_ids": {
+                "ipv4": int(ipv4_id) if ipv4_id else None,
+                "ipv6": int(ipv6_id) if ipv6_id else None,
+            },
+        }
 
     async def rebuild_full_manual(self, server_id: int, image_id):
         # Full rebuild: create a NEW server from selected image/snapshot then delete old one => new IP
