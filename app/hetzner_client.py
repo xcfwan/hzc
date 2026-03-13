@@ -246,6 +246,13 @@ class HetznerClient:
             r.raise_for_status()
             return r.json()
 
+    async def update_primary_ip_auto_delete(self, primary_ip_id: int, auto_delete: bool):
+        payload = {"auto_delete": bool(auto_delete)}
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.put(f"{BASE}/primary_ips/{primary_ip_id}", headers=self.headers, json=payload)
+            r.raise_for_status()
+            return r.json()
+
     async def rename_server(self, server_id: int, name: str):
         payload = {"name": name}
         async with httpx.AsyncClient(timeout=30) as c:

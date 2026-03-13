@@ -607,6 +607,12 @@ class MonitorService:
             return created
 
         try:
+            # 防止删机时 Primary IP 被级联删除（Hetzner auto_delete=true 场景）
+            if ipv4_id:
+                await self.client.update_primary_ip_auto_delete(int(ipv4_id), False)
+            if ipv6_id:
+                await self.client.update_primary_ip_auto_delete(int(ipv6_id), False)
+
             # FAST path: direct delete first
             await self.client.delete_server(server_id)
             created = await _create_with_retry()
