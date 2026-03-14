@@ -226,7 +226,6 @@ async def api_upgrade():
         "git fetch origin main >/dev/null 2>&1 || { echo '__FETCH_FAILED__'; exit 14; }; "
         "LOCAL=$(git rev-parse HEAD 2>/dev/null || true); REMOTE=$(git rev-parse origin/main 2>/dev/null || true); "
         "if [ -n \"$LOCAL\" ] && [ \"$LOCAL\" = \"$REMOTE\" ]; then echo '__UPGRADE_UPTODATE__'; exit 11; fi; "
-        "if ! docker info >/dev/null 2>&1; then echo '__DOCKER_UNAVAILABLE__'; exit 16; fi; "
         "if command -v docker-compose >/dev/null 2>&1; then "
         "  TASK_NAME=hzc-upgrader-$(date +%s); "
         "  CID=$(docker-compose run -d --rm --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"cd $ROOT && timeout 1800 ./scripts/upgrade.sh > $ROOT/state/upgrade.log 2>&1 || true\"); "
@@ -254,8 +253,6 @@ async def api_upgrade():
             return {"ok": False, "error": "拉取远端版本信息失败，请稍后重试。"}
         if "__ROOT_NOT_FOUND__" in so:
             return {"ok": False, "error": "未找到项目目录（缺少 docker-compose.yml 或 scripts/upgrade.sh）"}
-        if "__DOCKER_UNAVAILABLE__" in so:
-            return {"ok": False, "error": "Docker 守护进程不可用（请检查 docker 服务）"}
         return {"ok": False, "error": (se or so or "unknown error")[-700:]}
 
     monitor.runtime.update({"last_upgrade_trigger_ts": now})
