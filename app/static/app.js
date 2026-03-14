@@ -328,7 +328,31 @@ async function loadQBRealtime(){
   } catch(e){} finally { __loadingQB=false }
 }
 
-async function loadDaily(showToast=false){const r=await fetch('/api/daily_stats?days=7');renderDailyStats(await r.json()); if(showToast) toast('统计已刷新')}
+let __dailyLoaded=false
+async function loadDaily(showToast=false){
+  const r=await fetch('/api/daily_stats?days=7')
+  renderDailyStats(await r.json())
+  __dailyLoaded=true
+  if(showToast) toast('统计已刷新')
+}
+
+function lazyLoadDailyOnce(){
+  if(__dailyLoaded) return
+  const sec=document.getElementById('dailyStats')
+  if(!sec){ loadDaily(false); return }
+  if('IntersectionObserver' in window){
+    const ob=new IntersectionObserver((entries)=>{
+      const e=entries[0]
+      if(e && e.isIntersecting){
+        loadDaily(false)
+        ob.disconnect()
+      }
+    },{rootMargin:'120px'})
+    ob.observe(sec)
+  }else{
+    setTimeout(()=>loadDaily(false),120)
+  }
+}
 
 async function loadQBNodes(){
   const r=await fetch('/api/qb_nodes')
@@ -370,9 +394,8 @@ async function loadAll(showToast=false){
   await Promise.allSettled([loadMeta(false),loadQBNodes(),loadAutoPolicies(),loadSafeMode()])
   loadQBRealtime()
 
-  // 图表较重，放到空闲帧再加载
-  const idle = window.requestIdleCallback || ((fn)=>setTimeout(fn, 120))
-  idle(()=>loadDaily(false))
+  // 图表较重，滚动到模块附近再加载
+  lazyLoadDailyOnce()
 
   if(showToast) toast('全部数据已刷新')
 }
@@ -752,5 +775,5 @@ loadAll(false)
 // layered refresh: qB high-frequency, others lower frequency
 setInterval(()=>{ if(!document.hidden) loadQBRealtime() }, 3000)
 setInterval(()=>{ if(!document.hidden) loadData(false) }, 15000)
-setInterval(()=>{ if(!document.hidden) loadDaily(false) }, 60000)
+setInterval(()=>{ if(!document.hidden && __dailyLoaded) loadDaily(false) }, 60000)
 setInterval(()=>{ if(!document.hidden) loadMeta(false) }, 300000)

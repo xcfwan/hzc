@@ -25,6 +25,9 @@ class MonitorService:
         self._collect_cache = []
         self._collect_cache_ts = 0.0
         self._collect_cache_ttl = 6.0
+        self._daily_cache = {}
+        self._daily_cache_ts = 0.0
+        self._daily_cache_ttl = 30.0
 
     async def meta(self):
         types = await self.client.list_server_types()
@@ -115,14 +118,25 @@ class MonitorService:
         }
 
     async def daily_stats(self, days: int = 7):
+        now_ts = dt.datetime.utcnow().timestamp()
+        cache_key = f"days:{int(days)}"
+        if (now_ts - self._daily_cache_ts) < self._daily_cache_ttl and cache_key in self._daily_cache:
+            return self._daily_cache.get(cache_key, [])
+
         servers = await self.client.list_servers()
-        result = []
-        for s in servers:
-            try:
-                daily = await self.client.get_outbound_daily(s["id"], days=days)
-            except Exception:
-                daily = []
-            result.append({"id": s["id"], "name": s["name"], "daily": daily})
+        sem = asyncio.Semaphore(8)
+
+        async def _fetch_one(s):
+            async with sem:
+                try:
+                    daily = await self.client.get_outbound_daily(s["id"], days=days)
+                except Exception:
+                    daily = []
+                return {"id": s["id"], "name": s.get("name", f"server-{s['id']}"), "daily": daily}
+
+        result = await asyncio.gather(*[_fetch_one(s) for s in servers]) if servers else []
+        self._daily_cache[cache_key] = result
+        self._daily_cache_ts = now_ts
         return result
 
     async def collect(self, use_cache: bool = True):
@@ -157,10 +171,6 @@ class MonitorService:
                 today_bytes = await today_tasks[s["id"]]
             except Exception:
                 today_bytes = 0
-            try:
-                daily = await self.client.get_outbound_daily(s["id"], days=2)
-            except Exception:
-                daily = []
             today_gb = (today_bytes / (1024**3)) if today_bytes else 0.0
             qbs = {"enabled": False}
             t = qb_tasks.get(str(s["id"]))
