@@ -363,10 +363,17 @@ async function toggleSafeMode(){
 }
 
 async function loadAll(showToast=false){
-  await Promise.all([loadMeta(false),loadQBNodes(),loadAutoPolicies(),loadData(false),loadSafeMode()])
+  // 先加载主列表，保证首屏尽快可见
+  await loadData(false)
+
+  // 元数据/配置并行加载，避免阻塞首屏交互
+  await Promise.allSettled([loadMeta(false),loadQBNodes(),loadAutoPolicies(),loadSafeMode()])
   loadQBRealtime()
-  // defer heavy chart data to improve first paint smoothness
-  setTimeout(()=>loadDaily(false), 0)
+
+  // 图表较重，放到空闲帧再加载
+  const idle = window.requestIdleCallback || ((fn)=>setTimeout(fn, 120))
+  idle(()=>loadDaily(false))
+
   if(showToast) toast('全部数据已刷新')
 }
 
