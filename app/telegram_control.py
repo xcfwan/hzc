@@ -152,16 +152,20 @@ class TelegramControl:
             # run upgrade in helper container with a fixed lock name
             # stale running lock (>30min) will be force cleaned automatically
             upgrade_cmd = (
-                "set -e; mkdir -p /opt/hzc/state; cd /opt/hzc; "
+                "set -e; "
+                "ROOT=''; for d in /opt/hzc /app .; do if [ -f \"$d/docker-compose.yml\" ] && [ -f \"$d/scripts/upgrade.sh\" ]; then ROOT=\"$d\"; break; fi; done; "
+                "if [ -z \"$ROOT\" ]; then echo '__ROOT_NOT_FOUND__'; exit 15; fi; "
+                "mkdir -p \"$ROOT/state\"; cd \"$ROOT\"; "
                 "git fetch origin main >/dev/null 2>&1 || { echo '__FETCH_FAILED__'; exit 14; }; "
                 "LOCAL=$(git rev-parse HEAD 2>/dev/null || true); REMOTE=$(git rev-parse origin/main 2>/dev/null || true); "
                 "if [ -n \"$LOCAL\" ] && [ \"$LOCAL\" = \"$REMOTE\" ]; then echo '__UPGRADE_UPTODATE__'; exit 11; fi; "
+                "if ! docker info >/dev/null 2>&1; then echo '__DOCKER_UNAVAILABLE__'; exit 16; fi; "
                 "if command -v docker-compose >/dev/null 2>&1; then "
                 "  TASK_NAME=hzc-upgrader-$(date +%s); "
-                "  CID=$(docker-compose run -d --rm --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"cd /opt/hzc && timeout 1800 ./scripts/upgrade.sh > /opt/hzc/state/upgrade.log 2>&1 || true\"); "
+                "  CID=$(docker-compose run -d --rm --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"cd $ROOT && timeout 1800 ./scripts/upgrade.sh > $ROOT/state/upgrade.log 2>&1 || true\"); "
                 "elif docker compose version >/dev/null 2>&1; then "
                 "  TASK_NAME=hzc-upgrader-$(date +%s); "
-                "  CID=$(docker compose run -d --rm --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"cd /opt/hzc && timeout 1800 ./scripts/upgrade.sh > /opt/hzc/state/upgrade.log 2>&1 || true\"); "
+                "  CID=$(docker compose run -d --rm --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"cd $ROOT && timeout 1800 ./scripts/upgrade.sh > $ROOT/state/upgrade.log 2>&1 || true\"); "
                 "else echo '__NO_COMPOSE__'; exit 13; fi; "
                 "echo $CID"
             )
@@ -180,6 +184,10 @@ class TelegramControl:
                     return await self.send("升级任务触发失败：未检测到 docker compose / docker-compose", chat_id)
                 if "__FETCH_FAILED__" in so:
                     return await self.send("升级任务触发失败：拉取远端版本信息失败，请稍后重试。", chat_id)
+                if "__ROOT_NOT_FOUND__" in so:
+                    return await self.send("升级任务触发失败：未找到项目目录（缺少 docker-compose.yml 或 scripts/upgrade.sh）。", chat_id)
+                if "__DOCKER_UNAVAILABLE__" in so:
+                    return await self.send("升级任务触发失败：Docker 守护进程不可用（请检查 docker 服务）。", chat_id)
                 msg = (se or so or "unknown error")[-700:]
                 return await self.send(f"升级任务触发失败：{msg}", chat_id)
 
@@ -189,12 +197,12 @@ class TelegramControl:
 
         if cmd == "/upgradelog":
             if len(parts) >= 2 and parts[1].lower() == "full":
-                p = await asyncio.create_subprocess_shell("bash -lc 'tail -n 160 /opt/hzc/state/upgrade.log 2>/dev/null || echo no-log'", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                p = await asyncio.create_subprocess_shell("bash -lc 'for f in /opt/hzc/state/upgrade.log /app/state/upgrade.log ./state/upgrade.log; do [ -f \"$f\" ] && { tail -n 160 \"$f\"; exit 0; }; done; echo no-log'", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
                 out, _ = await p.communicate()
                 txt = (out.decode("utf-8", errors="ignore") or "no-log").strip()
                 return await self.send(f"<code>{txt[-3200:]}</code>", chat_id)
 
-            p = await asyncio.create_subprocess_shell("bash -lc 'tail -n 300 /opt/hzc/state/upgrade.log 2>/dev/null || echo no-log'", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            p = await asyncio.create_subprocess_shell("bash -lc 'for f in /opt/hzc/state/upgrade.log /app/state/upgrade.log ./state/upgrade.log; do [ -f \"$f\" ] && { tail -n 300 \"$f\"; exit 0; }; done; echo no-log'", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
             out, _ = await p.communicate()
             txt = (out.decode("utf-8", errors="ignore") or "no-log").strip()
             lines = txt.splitlines()
