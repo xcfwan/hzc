@@ -50,5 +50,5 @@ body[data-theme='light'] .delete-grid .option-chip{background:#f6f8ff}
 .modal-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .stock-ok{color:var(--green)}.stock-warn{color:var(--orange)}.stock-bad{color:var(--red)}
 .toast{position:fixed;right:16px;bottom:16px;padding:12px 14px;border-radius:10px;background:#111b3f;border:1px solid #3d56a7;color:#fff;z-index:30;box-shadow:0 8px 30px #00000052}
-@media(max-width:980px){.cards{grid-template-columns:repeat(2,minmax(140px,1fr))}.topbar{flex-direction:column;align-items:flex-start}.grid{grid-template-columns:1fr}.daily-stats{grid-template-columns:1fr}.actions input{min-width:unset;width:100%}.glass{backdrop-filter:none}}
+@media(max-width:980px){.cards{grid-template-columns:repeat(2,minmax(140px,1fr))}.topbar{flex-direction:column;align-items:flex-start}.grid{grid-template-columns:1fr}.daily-stats{grid-template-columns:1fr}.actions{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.actions .btn{width:100%;min-width:0}.actions input{grid-column:1/-1;min-width:unset;width:100%}#createServerBtn{grid-column:1/-1}.glass{backdrop-filter:none}}
 @media (prefers-reduced-motion: reduce){*{transition:none !important;animation:none !important}}
