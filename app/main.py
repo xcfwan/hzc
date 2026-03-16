@@ -231,15 +231,11 @@ async def api_upgrade():
         "    apt-get update >/dev/null 2>&1 && apt-get install -y --no-install-recommends docker-compose-plugin docker-compose >/dev/null 2>&1 || true; "
         "  fi; "
         "fi; "
-        "if command -v docker-compose >/dev/null 2>&1; then "
-        "  TASK_NAME=hzc-upgrader-$(date +%s); "
-        "  CID=$(docker-compose run -d --rm --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"cd $ROOT && timeout 1800 ./scripts/upgrade.sh > $ROOT/state/upgrade.log 2>&1\"); "
-        "elif docker compose version >/dev/null 2>&1; then "
-        "  TASK_NAME=hzc-upgrader-$(date +%s); "
-        "  CID=$(docker compose run -d --rm --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"cd $ROOT && timeout 1800 ./scripts/upgrade.sh > $ROOT/state/upgrade.log 2>&1\"); "
-        "elif ! command -v docker >/dev/null 2>&1; then echo '__NO_DOCKER__'; exit 17; "
-        "else echo '__NO_COMPOSE__'; exit 13; fi; "
-        "echo $CID"
+        "if ! command -v docker-compose >/dev/null 2>&1 && ! docker compose version >/dev/null 2>&1; then "
+        "  if ! command -v docker >/dev/null 2>&1; then echo '__NO_DOCKER__'; exit 17; else echo '__NO_COMPOSE__'; exit 13; fi; "
+        "fi; "
+        "nohup bash -lc \"cd $ROOT && timeout 1800 ./scripts/upgrade.sh > $ROOT/state/upgrade.log 2>&1\" >/dev/null 2>&1 & "
+        "echo $!"
     )
     p = await asyncio.create_subprocess_exec(
         "bash", "-lc", upgrade_cmd,
@@ -264,8 +260,8 @@ async def api_upgrade():
         return {"ok": False, "error": (se or so or "unknown error")[-700:]}
 
     monitor.runtime.update({"last_upgrade_trigger_ts": now})
-    cid = (out.decode("utf-8", errors="ignore") if out else "").strip().splitlines()[-1][:24]
-    return {"ok": True, "queued": True, "task_id": cid or "n/a", "message": "升级任务已触发"}
+    pid = (out.decode("utf-8", errors="ignore") if out else "").strip().splitlines()[-1][:24]
+    return {"ok": True, "queued": True, "task_id": pid or "n/a", "message": "升级任务已触发"}
 
 
 @app.post('/api/rotate/{server_id}')

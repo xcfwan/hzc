@@ -164,15 +164,11 @@ class TelegramControl:
                 "    apt-get update >/dev/null 2>&1 && apt-get install -y --no-install-recommends docker-compose-plugin docker-compose >/dev/null 2>&1 || true; "
                 "  fi; "
                 "fi; "
-                "if command -v docker-compose >/dev/null 2>&1; then "
-                "  TASK_NAME=hzc-upgrader-$(date +%s); "
-                "  CID=$(docker-compose run -d --rm --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"cd $ROOT && timeout 1800 ./scripts/upgrade.sh > $ROOT/state/upgrade.log 2>&1\"); "
-                "elif docker compose version >/dev/null 2>&1; then "
-                "  TASK_NAME=hzc-upgrader-$(date +%s); "
-                "  CID=$(docker compose run -d --rm --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"cd $ROOT && timeout 1800 ./scripts/upgrade.sh > $ROOT/state/upgrade.log 2>&1\"); "
-                "elif ! command -v docker >/dev/null 2>&1; then echo '__NO_DOCKER__'; exit 17; "
-                "else echo '__NO_COMPOSE__'; exit 13; fi; "
-                "echo $CID"
+                "if ! command -v docker-compose >/dev/null 2>&1 && ! docker compose version >/dev/null 2>&1; then "
+                "  if ! command -v docker >/dev/null 2>&1; then echo '__NO_DOCKER__'; exit 17; else echo '__NO_COMPOSE__'; exit 13; fi; "
+                "fi; "
+                "nohup bash -lc \"cd $ROOT && timeout 1800 ./scripts/upgrade.sh > $ROOT/state/upgrade.log 2>&1\" >/dev/null 2>&1 & "
+                "echo $!"
             )
             p = await asyncio.create_subprocess_exec(
                 "bash", "-lc", upgrade_cmd,
@@ -197,8 +193,8 @@ class TelegramControl:
                 return await self.send(f"升级任务触发失败：{msg}", chat_id)
 
             self.runtime.update({"last_upgrade_trigger_ts": now})
-            cid = (out.decode("utf-8", errors="ignore") if out else "").strip().splitlines()[-1][:24]
-            return await self.send(f"开始执行一键升级（拉取最新代码并重建容器）...\n升级任务已触发（task: {cid or 'n/a'}）。约30-120秒后生效。\n可点【🏷️ 版本号】或【📜 升级日志】确认。", chat_id)
+            pid = (out.decode("utf-8", errors="ignore") if out else "").strip().splitlines()[-1][:24]
+            return await self.send(f"开始执行一键升级（拉取最新代码并重建容器）...\n升级任务已触发（task: {pid or 'n/a'}）。约30-120秒后生效。\n可点【🏷️ 版本号】或【📜 升级日志】确认。", chat_id)
 
         if cmd == "/upgradelog":
             if len(parts) >= 2 and parts[1].lower() == "full":
