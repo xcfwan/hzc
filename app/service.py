@@ -58,22 +58,62 @@ class MonitorService:
             if v6id:
                 used_ipv6[int(v6id)] = {"server_id": sid, "server_name": sname}
 
+        server_types = []
+        for t in (types or []):
+            if not isinstance(t, dict):
+                continue
+            prices = [p for p in (t.get("prices") or []) if isinstance(p, dict)]
+            server_types.append({
+                "name": t.get("name"),
+                "cores": t.get("cores"),
+                "memory": t.get("memory"),
+                "disk": t.get("disk"),
+                "prices": prices,
+                # API可售性（非实时库存）：根据 Hetzner server_types.prices 是否包含该 location
+                "sellable_locations": [p.get("location") for p in prices if p.get("location")],
+            })
+
+        primary_ipv4s = []
+        primary_ipv6s = []
+        for p in (pips or []):
+            if not isinstance(p, dict):
+                continue
+            pid = p.get("id")
+            try:
+                pid_key = int(pid)
+            except Exception:
+                pid_key = None
+            occupied_map4 = used_ipv4.get(pid_key) if pid_key is not None else None
+            occupied_map6 = used_ipv6.get(pid_key) if pid_key is not None else None
+
+            row = {
+                "id": pid,
+                "ip": p.get("ip"),
+                "name": p.get("name") or f"ip-{pid}",
+                "location": ((p.get("datacenter") or {}).get("location") or {}).get("name") or (p.get("location") or {}).get("name"),
+                "datacenter": (p.get("datacenter") or {}).get("name"),
+            }
+
+            if p.get("type") == "ipv4":
+                row["occupied"] = bool((p.get("assignee") or {}).get("id") or occupied_map4)
+                row["occupied_by"] = occupied_map4 or {
+                    "server_id": ((p.get("assignee") or {}).get("id")),
+                    "server_name": ((p.get("assignee") or {}).get("name")) or "unknown",
+                }
+                primary_ipv4s.append(row)
+            elif p.get("type") == "ipv6":
+                row["occupied"] = bool((p.get("assignee") or {}).get("id") or occupied_map6)
+                row["occupied_by"] = occupied_map6 or {
+                    "server_id": ((p.get("assignee") or {}).get("id")),
+                    "server_name": ((p.get("assignee") or {}).get("name")) or "unknown",
+                }
+                primary_ipv6s.append(row)
+
         return {
             "app_version": settings.app_version,
             "app_commit": settings.app_commit,
-            "server_types": [
-                {
-                    "name": t.get("name"),
-                    "cores": t.get("cores"),
-                    "memory": t.get("memory"),
-                    "disk": t.get("disk"),
-                    "prices": t.get("prices", []),
-                    # API可售性（非实时库存）：根据 Hetzner server_types.prices 是否包含该 location
-                    "sellable_locations": [p.get("location") for p in (t.get("prices") or []) if p.get("location")],
-                }
-                for t in types
-            ],
-            "locations": [{"name": l.get("name"), "city": l.get("city")} for l in locations],
+            "server_types": server_types,
+            "locations": [{"name": l.get("name"), "city": l.get("city")} for l in (locations or []) if isinstance(l, dict)],
             "snapshots": [
                 {
                     "id": i.get("id"),
@@ -81,40 +121,11 @@ class MonitorService:
                     "size_gb": round(float(i.get("image_size") or 0), 2),
                     "created": i.get("created"),
                 }
-                for i in snapshots
+                for i in (snapshots or [])
+                if isinstance(i, dict)
             ],
-            "primary_ipv4s": [
-                {
-                    "id": p.get("id"),
-                    "ip": p.get("ip"),
-                    "name": p.get("name") or f"ip-{p.get('id')}",
-                    "location": ((p.get("datacenter") or {}).get("location") or {}).get("name") or (p.get("location") or {}).get("name"),
-                    "datacenter": (p.get("datacenter") or {}).get("name"),
-                    "occupied": bool((p.get("assignee") or {}).get("id") or used_ipv4.get(int(p.get("id") or 0))),
-                    "occupied_by": used_ipv4.get(int(p.get("id") or 0)) or {
-                        "server_id": ((p.get("assignee") or {}).get("id")),
-                        "server_name": ((p.get("assignee") or {}).get("name")) or "unknown",
-                    },
-                }
-                for p in pips
-                if p.get("type") == "ipv4"
-            ],
-            "primary_ipv6s": [
-                {
-                    "id": p.get("id"),
-                    "ip": p.get("ip"),
-                    "name": p.get("name") or f"ip-{p.get('id')}",
-                    "location": ((p.get("datacenter") or {}).get("location") or {}).get("name") or (p.get("location") or {}).get("name"),
-                    "datacenter": (p.get("datacenter") or {}).get("name"),
-                    "occupied": bool((p.get("assignee") or {}).get("id") or used_ipv6.get(int(p.get("id") or 0))),
-                    "occupied_by": used_ipv6.get(int(p.get("id") or 0)) or {
-                        "server_id": ((p.get("assignee") or {}).get("id")),
-                        "server_name": ((p.get("assignee") or {}).get("name")) or "unknown",
-                    },
-                }
-                for p in pips
-                if p.get("type") == "ipv6"
-            ],
+            "primary_ipv4s": primary_ipv4s,
+            "primary_ipv6s": primary_ipv6s,
         }
 
     async def daily_stats(self, days: int = 7):
