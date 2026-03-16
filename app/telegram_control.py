@@ -161,10 +161,10 @@ class TelegramControl:
                 "if [ -n \"$LOCAL\" ] && [ \"$LOCAL\" = \"$REMOTE\" ]; then echo '__UPGRADE_UPTODATE__'; exit 11; fi; "
                 "if command -v docker-compose >/dev/null 2>&1; then "
                 "  TASK_NAME=hzc-upgrader-$(date +%s); "
-                "  CID=$(docker-compose run -d --rm --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"cd $ROOT && timeout 1800 ./scripts/upgrade.sh > $ROOT/state/upgrade.log 2>&1 || true\"); "
+                "  CID=$(docker-compose run -d --rm --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"cd $ROOT && timeout 1800 ./scripts/upgrade.sh > $ROOT/state/upgrade.log 2>&1\"); "
                 "elif docker compose version >/dev/null 2>&1; then "
                 "  TASK_NAME=hzc-upgrader-$(date +%s); "
-                "  CID=$(docker compose run -d --rm --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"cd $ROOT && timeout 1800 ./scripts/upgrade.sh > $ROOT/state/upgrade.log 2>&1 || true\"); "
+                "  CID=$(docker compose run -d --rm --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"cd $ROOT && timeout 1800 ./scripts/upgrade.sh > $ROOT/state/upgrade.log 2>&1\"); "
                 "else echo '__NO_COMPOSE__'; exit 13; fi; "
                 "echo $CID"
             )
