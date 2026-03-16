@@ -469,22 +469,24 @@ class MonitorService:
         if not srv:
             return {"ok": False, "error": "server not found"}
 
-        snapshot_action = None
+        async def _wait_action_success(action_id: int, title: str):
+            for _ in range(90):
+                act = await self.client.get_action(action_id)
+                st = (act or {}).get("status")
+                if st == "success":
+                    return True
+                if st == "error":
+                    raise RuntimeError(f"{title} failed: {act}")
+                await asyncio.sleep(4)
+            raise RuntimeError(f"{title} timeout: {action_id}")
+
         snapshot_name = None
         if create_snapshot:
             snapshot_name = f"before-delete-{srv.get('name','server')}-{dt.datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
             snap_res = await self.client.create_snapshot(server_id, snapshot_name)
-            snapshot_action = (snap_res or {}).get("action", {})
-            action_id = snapshot_action.get("id")
+            action_id = ((snap_res or {}).get("action") or {}).get("id")
             if action_id:
-                for _ in range(180):  # up to ~15min
-                    act = await self.client.get_action(action_id)
-                    st = (act or {}).get("status")
-                    if st == "success":
-                        break
-                    if st == "error":
-                        return {"ok": False, "error": "snapshot failed", "action": act}
-                    await asyncio.sleep(5)
+                await _wait_action_success(int(action_id), f"snapshot server#{server_id}")
 
         net = srv.get("public_net") or {}
         ipv4_id = ((net.get("ipv4") or {}).get("id"))
@@ -493,26 +495,68 @@ class MonitorService:
         kept = {"ipv4": None, "ipv6": None}
         deleted_primary_ips = {"ipv4": None, "ipv6": None}
 
-        # 勾选保留：先解绑并保留资源；未勾选：删除服务器后删除Primary IP资源
-        if keep_ipv4 and ipv4_id:
-            await self.client.unassign_primary_ip(int(ipv4_id))
-            kept["ipv4"] = int(ipv4_id)
-        if keep_ipv6 and ipv6_id:
-            await self.client.unassign_primary_ip(int(ipv6_id))
-            kept["ipv6"] = int(ipv6_id)
+        try:
+            # 需要保留IP时，先禁止级联删除，避免删机把IP一起删掉
+            if keep_ipv4 and ipv4_id:
+                await self.client.update_primary_ip_auto_delete(int(ipv4_id), False)
+            if keep_ipv6 and ipv6_id:
+                await self.client.update_primary_ip_auto_delete(int(ipv6_id), False)
 
-        await self.client.delete_server(server_id)
+            if (keep_ipv4 or keep_ipv6) and keep_mode == "safe":
+                # safe模式：先关机，再解绑，规避422
+                pof = await self.client.server_action(server_id, "poweroff")
+                pof_id = ((pof or {}).get("action") or {}).get("id")
+                if pof_id:
+                    await _wait_action_success(int(pof_id), f"poweroff server#{server_id}")
 
-        if (not keep_ipv4) and ipv4_id:
-            await self.client.delete_primary_ip(int(ipv4_id))
-            deleted_primary_ips["ipv4"] = int(ipv4_id)
-        if (not keep_ipv6) and ipv6_id:
-            await self.client.delete_primary_ip(int(ipv6_id))
-            deleted_primary_ips["ipv6"] = int(ipv6_id)
+                if keep_ipv4 and ipv4_id:
+                    r4 = await self.client.unassign_primary_ip(int(ipv4_id))
+                    a4 = ((r4 or {}).get("action") or {}).get("id")
+                    if a4:
+                        await _wait_action_success(int(a4), f"unassign ipv4#{ipv4_id}")
+                    kept["ipv4"] = int(ipv4_id)
+                if keep_ipv6 and ipv6_id:
+                    r6 = await self.client.unassign_primary_ip(int(ipv6_id))
+                    a6 = ((r6 or {}).get("action") or {}).get("id")
+                    if a6:
+                        await _wait_action_success(int(a6), f"unassign ipv6#{ipv6_id}")
+                    kept["ipv6"] = int(ipv6_id)
+            else:
+                if keep_ipv4 and ipv4_id:
+                    kept["ipv4"] = int(ipv4_id)
+                if keep_ipv6 and ipv6_id:
+                    kept["ipv6"] = int(ipv6_id)
+
+            await self.client.delete_server(server_id)
+
+            # 未勾选保留IP时删除Primary IP（若已被级联删除/不存在则忽略404）
+            if (not keep_ipv4) and ipv4_id:
+                try:
+                    await self.client.delete_primary_ip(int(ipv4_id))
+                    deleted_primary_ips["ipv4"] = int(ipv4_id)
+                except httpx.HTTPStatusError as e:
+                    if not (e.response is not None and e.response.status_code == 404):
+                        raise
+            if (not keep_ipv6) and ipv6_id:
+                try:
+                    await self.client.delete_primary_ip(int(ipv6_id))
+                    deleted_primary_ips["ipv6"] = int(ipv6_id)
+                except httpx.HTTPStatusError as e:
+                    if not (e.response is not None and e.response.status_code == 404):
+                        raise
+        except Exception as e:
+            detail = str(e)
+            if isinstance(e, httpx.HTTPStatusError) and e.response is not None:
+                try:
+                    detail = f"HTTP {e.response.status_code}: {e.response.text}"
+                except Exception:
+                    detail = str(e)
+            return {"ok": False, "error": detail}
 
         await self.tg.send(
             f"🗑️ 服务器已删除\nID: {server_id}\n名称: {srv.get('name','-')}\n"
             f"快照: {'已创建' if create_snapshot else '未创建'}{f' ({snapshot_name})' if snapshot_name else ''}\n"
+            f"模式: {keep_mode}\n"
             f"保留IPv4: {'是' if bool(kept['ipv4']) else '否'}\n"
             f"保留IPv6: {'是' if bool(kept['ipv6']) else '否'}\n"
             f"已删除Primary IPv4: {'是' if bool(deleted_primary_ips['ipv4']) else '否'}\n"
@@ -523,6 +567,7 @@ class MonitorService:
             "deleted_server_id": server_id,
             "snapshot_created": bool(create_snapshot),
             "snapshot_name": snapshot_name,
+            "keep_mode": keep_mode,
             "kept_primary_ip_ids": kept,
             "deleted_primary_ip_ids": deleted_primary_ips,
         }
