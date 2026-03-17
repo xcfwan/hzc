@@ -233,10 +233,12 @@ async def api_upgrade():
         "fi; "
         "if command -v docker-compose >/dev/null 2>&1; then "
         "  TASK_NAME=hzc-upgrader-$(date +%s); "
-        "  CID=$(docker-compose run -d --rm --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"CROOT=''; for d in /opt/hzc /workspace /app /root/hzc .; do if [ -f \\\"$d/scripts/upgrade.sh\\\" ]; then CROOT=\\\"$d\\\"; break; fi; done; [ -n \\\"$CROOT\\\" ] || { echo __CONTAINER_ROOT_NOT_FOUND__; exit 18; }; mkdir -p \\\"$CROOT/state\\\"; cd \\\"$CROOT\\\"; timeout 1800 ./scripts/upgrade.sh > \\\"$CROOT/state/upgrade.log\\\" 2>&1\"); "
+        "  CID=$(docker-compose run -d --rm --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"CROOT=''; for d in /opt/hzc /workspace /app /root/hzc .; do if [ -f \\\"$d/scripts/upgrade.sh\\\" ]; then CROOT=\\\"$d\\\"; break; fi; done; [ -n \\\"$CROOT\\\" ] || { echo __CONTAINER_ROOT_NOT_FOUND__; exit 18; }; mkdir -p \\\"$CROOT/state\\\"; cd \\\"$CROOT\\\"; timeout 1800 ./scripts/upgrade.sh > \\\"$CROOT/state/upgrade.log\\\" 2>&1\") || { echo '__RUN_FAILED__'; exit 19; }; "
+        "  [ -n \"$CID\" ] || { echo '__RUN_FAILED__'; exit 19; }; "
         "elif docker compose version >/dev/null 2>&1; then "
         "  TASK_NAME=hzc-upgrader-$(date +%s); "
-        "  CID=$(docker compose run -d --rm --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"CROOT=''; for d in /opt/hzc /workspace /app /root/hzc .; do if [ -f \\\"$d/scripts/upgrade.sh\\\" ]; then CROOT=\\\"$d\\\"; break; fi; done; [ -n \\\"$CROOT\\\" ] || { echo __CONTAINER_ROOT_NOT_FOUND__; exit 18; }; mkdir -p \\\"$CROOT/state\\\"; cd \\\"$CROOT\\\"; timeout 1800 ./scripts/upgrade.sh > \\\"$CROOT/state/upgrade.log\\\" 2>&1\"); "
+        "  CID=$(docker compose run -d --rm --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"CROOT=''; for d in /opt/hzc /workspace /app /root/hzc .; do if [ -f \\\"$d/scripts/upgrade.sh\\\" ]; then CROOT=\\\"$d\\\"; break; fi; done; [ -n \\\"$CROOT\\\" ] || { echo __CONTAINER_ROOT_NOT_FOUND__; exit 18; }; mkdir -p \\\"$CROOT/state\\\"; cd \\\"$CROOT\\\"; timeout 1800 ./scripts/upgrade.sh > \\\"$CROOT/state/upgrade.log\\\" 2>&1\") || { echo '__RUN_FAILED__'; exit 19; }; "
+        "  [ -n \"$CID\" ] || { echo '__RUN_FAILED__'; exit 19; }; "
         "elif ! command -v docker >/dev/null 2>&1; then echo '__NO_DOCKER__'; exit 17; "
         "else echo '__NO_COMPOSE__'; exit 13; fi; "
         "echo $CID"
@@ -259,6 +261,8 @@ async def api_upgrade():
             return {"ok": False, "error": "未检测到 docker，无法执行容器升级"}
         if "__CONTAINER_ROOT_NOT_FOUND__" in so:
             return {"ok": False, "error": "容器内未找到 scripts/upgrade.sh（挂载路径不兼容）"}
+        if "__RUN_FAILED__" in so:
+            return {"ok": False, "error": "升级任务容器启动失败（docker/compose执行异常）"}
         if "__FETCH_FAILED__" in so:
             return {"ok": False, "error": "拉取远端版本信息失败，请稍后重试。"}
         if "__ROOT_NOT_FOUND__" in so:
