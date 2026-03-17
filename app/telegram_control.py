@@ -153,6 +153,9 @@ class TelegramControl:
             if now - last_ts < 25:
                 return await self.send("已有升级请求刚触发，请勿重复点击（25秒内防抖）", chat_id)
 
+            # 先回执，避免升级重启时用户感知为“无反馈”
+            await self.send("已收到升级指令，开始执行一键升级（约30-120秒）。", chat_id)
+
             # run upgrade in helper container with a fixed lock name
             # stale running lock (>30min) will be force cleaned automatically
             upgrade_cmd = (
