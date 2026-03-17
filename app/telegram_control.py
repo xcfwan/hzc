@@ -12,8 +12,8 @@ class TelegramControl:
         self.monitor = monitor
         self.runtime = RuntimeConfig(settings.runtime_config_path)
         rc = self.runtime.get()
-        self.token = str(rc.get("telegram_bot_token") or settings.telegram_bot_token or "")
-        self.chat_id = str(rc.get("telegram_chat_id") or settings.telegram_chat_id or "")
+        self.token = str(rc.get("telegram_bot_token") or settings.telegram_bot_token or "").strip()
+        self.chat_id = str(rc.get("telegram_chat_id") or settings.telegram_chat_id or "").strip()
         self.offset = int(rc.get("telegram_update_offset") or 0)
 
     @property
@@ -94,7 +94,7 @@ class TelegramControl:
         await self.api("setMyCommands", {"commands": cmds})
 
     async def handle(self, text: str, chat_id: str):
-        t = (text or "").strip()
+        t = (text or "").replace("\ufe0f", "").strip()
         quick = {
             "📋 服务器列表": "/list",
             "📊 系统状态": "/status",
@@ -108,6 +108,10 @@ class TelegramControl:
             "❓帮助": "/help",
         }
         t = quick.get(t, t)
+        if "一键升级" in t:
+            t = "/upgrade"
+        elif "升级日志" in t:
+            t = "/upgradelog"
         parts = t.split()
         cmd = parts[0].lower() if parts else ""
 
