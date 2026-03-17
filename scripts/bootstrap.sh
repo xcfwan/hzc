@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/liqiba/hzc.git"
-TARGET_DIR="${HZC_DIR:-hzc}"
+TARGET_DIR="${HZC_DIR:-/opt/hzc}"
 BRANCH="${HZC_BRANCH:-main}"
 ACTION="${1:-menu}"
 
@@ -16,6 +16,11 @@ else
 fi
 
 chmod +x "$TARGET_DIR/scripts/onekey.sh"
+
+# compatibility: keep /opt/hzc as canonical path for in-container helper upgrade
+if [ "$TARGET_DIR" != "/opt/hzc" ] && [ ! -e /opt/hzc ]; then
+  ln -s "$TARGET_DIR" /opt/hzc 2>/dev/null || true
+fi
 
 case "$ACTION" in
   menu)

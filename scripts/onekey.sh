@@ -3,6 +3,18 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+ensure_compat_path() {
+  local cur
+  cur="$(pwd)"
+  if [ "$cur" = "/opt/hzc" ]; then
+    return 0
+  fi
+
+  if [ ! -e /opt/hzc ]; then
+    ln -s "$cur" /opt/hzc 2>/dev/null || true
+  fi
+}
+
 pick_compose() {
   if command -v docker-compose >/dev/null 2>&1; then
     echo "docker-compose"
@@ -119,6 +131,8 @@ EOF
 }
 
 main() {
+  ensure_compat_path
+
   case "${1:-}" in
     install) do_install; exit 0 ;;
     upgrade) do_upgrade; exit 0 ;;
