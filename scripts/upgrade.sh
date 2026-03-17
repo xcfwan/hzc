@@ -32,8 +32,10 @@ LOCAL_BEFORE="$(git rev-parse HEAD)"
 REMOTE_HEAD="$(git rev-parse origin/main)"
 echo "[i] local(before)=${LOCAL_BEFORE:0:7} remote=${REMOTE_HEAD:0:7}"
 
-echo "[i] 强制同步到最新版（会覆盖本地代码改动）..."
-git reset --hard origin/main
+if [ "$LOCAL_BEFORE" != "$REMOTE_HEAD" ]; then
+  echo "[i] 强制同步到最新版（会覆盖本地代码改动）..."
+  git reset --hard origin/main
+fi
 
 LOCAL_AFTER="$(git rev-parse HEAD)"
 if [ "$LOCAL_AFTER" != "$REMOTE_HEAD" ]; then
@@ -66,8 +68,13 @@ if [ -n "$TARGET_VERSION" ]; then
   echo "[i] 已同步 .env APP_VERSION=${TARGET_VERSION}"
 fi
 
-echo "[i] 重建并更新容器..."
-$COMPOSE_CMD up -d --build
+if [ "$LOCAL_BEFORE" = "$REMOTE_HEAD" ]; then
+  echo "[i] 代码已是最新，执行轻量重载以应用版本号/环境变量..."
+  $COMPOSE_CMD up -d >/dev/null 2>&1 || true
+else
+  echo "[i] 重建并更新容器..."
+  $COMPOSE_CMD up -d --build
+fi
 
 echo "[i] 健康检查 /api/ping ..."
 APP_META=""
