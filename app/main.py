@@ -130,7 +130,9 @@ async def home(request: Request):
 async def servers():
     if not settings.hetzner_token:
         raise HTTPException(status_code=500, detail='HETZNER_TOKEN missing')
-    return await monitor.collect()
+    rows = await monitor.collect()
+    rollover = monitor._rollover_totals()
+    return {"rows": rows, "rollover": rollover}
 
 
 @app.get('/api/ping')

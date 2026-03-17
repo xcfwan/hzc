@@ -25,10 +25,11 @@ const toast=(msg)=>{const t=byId('toast');t.textContent=msg;t.classList.remove('
 function toggleTheme(){const b=document.body;const n=b.dataset.theme==='dark'?'light':'dark';b.dataset.theme=n;localStorage.setItem('theme',n);byId('themeBtn').textContent=n==='dark'?'☀️ 浅色':'🌙 深色'}
 function initTheme(){const t=localStorage.getItem('theme')||'dark';document.body.dataset.theme=t;byId('themeBtn').textContent=t==='dark'?'☀️ 浅色':'🌙 深色'}
 
-function renderCards(data){
+function renderCards(data, rollover={}){
   const total=data.length,warn=data.filter(x=>x.over_threshold).length
-  const used=data.reduce((a,b)=>a+(b.used_tb||0),0).toFixed(2)
-  const todaySumBytes=data.reduce((a,b)=>a+(Number(b.today_bytes||0)),0)
+  const rolloverMonthTB=(Number(rollover?.month_bytes||0)/(1024**4))
+  const used=(data.reduce((a,b)=>a+(b.used_tb||0),0)+rolloverMonthTB).toFixed(2)
+  const todaySumBytes=data.reduce((a,b)=>a+(Number(b.today_bytes||0)),0)+Number(rollover?.day_bytes||0)
   const todaySumTb=(todaySumBytes/1024/1024/1024/1024).toFixed(4)
   const avg=total?(data.reduce((a,b)=>a+(b.ratio||0),0)/total*100).toFixed(1):'0.0'
   byId('cards').innerHTML=`<div class="card"><div class="k">服务器总数</div><div class="v">${total}</div></div>
@@ -314,10 +315,13 @@ async function loadData(showToast=false){
   if(__loadingData) return
   __loadingData=true
   try{
-    const kw=((byId('kw')?.value)||'').trim().toLowerCase(),r=await fetch('/api/servers'),data=await r.json(); CURRENT_SERVERS=data
+    const kw=((byId('kw')?.value)||'').trim().toLowerCase(),r=await fetch('/api/servers'),payload=await r.json();
+    const data=Array.isArray(payload)?payload:(payload?.rows||[])
+    const rollover=Array.isArray(payload)?{}:(payload?.rollover||{})
+    CURRENT_SERVERS=data
     setCache(CACHE_KEYS.servers, data)
     setCache(CACHE_KEYS.ts, Date.now())
-    renderCards(data)
+    renderCards(data, rollover)
     const f=data.filter(x=>!kw||String(x.name).toLowerCase().includes(kw)||String(x.ip||'').toLowerCase().includes(kw)||String(x.id).includes(kw))
     patchTableRows(f)
     if(showToast) toast('已刷新')

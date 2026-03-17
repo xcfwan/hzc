@@ -29,6 +29,60 @@ class MonitorService:
         self._daily_cache_ts = 0.0
         self._daily_cache_ttl = 30.0
 
+    def _rollover_state(self):
+        rc = self.runtime.get()
+        st = rc.get("traffic_rollover") or {}
+        if not isinstance(st, dict):
+            st = {}
+        return st
+
+    def _rollover_totals(self):
+        st = self._rollover_state()
+        today = dt.datetime.utcnow().date().isoformat()
+        month = today[:7]
+        if st.get("month") != month:
+            st["month"] = month
+            st["month_bytes"] = 0
+        if st.get("day") != today:
+            st["day"] = today
+            st["day_bytes"] = 0
+        return {
+            "month_bytes": int(st.get("month_bytes") or 0),
+            "day_bytes": int(st.get("day_bytes") or 0),
+            "daily_history": st.get("daily_history") or {},
+        }
+
+    def _add_rollover(self, month_bytes: int, day_bytes: int, note: str = ""):
+        st = self._rollover_state()
+        today = dt.datetime.utcnow().date().isoformat()
+        month = today[:7]
+        if st.get("month") != month:
+            st["month"] = month
+            st["month_bytes"] = 0
+        if st.get("day") != today:
+            st["day"] = today
+            st["day_bytes"] = 0
+
+        st["month_bytes"] = int(st.get("month_bytes") or 0) + int(month_bytes or 0)
+        st["day_bytes"] = int(st.get("day_bytes") or 0) + int(day_bytes or 0)
+
+        hist = st.get("daily_history") or {}
+        if not isinstance(hist, dict):
+            hist = {}
+        hist[today] = int(hist.get(today) or 0) + int(day_bytes or 0)
+        for k in sorted(list(hist.keys()))[:-35]:
+            hist.pop(k, None)
+        st["daily_history"] = hist
+
+        if note:
+            events = st.get("events") or []
+            if not isinstance(events, list):
+                events = []
+            events.append({"ts": int(dt.datetime.utcnow().timestamp()), "note": note, "month_bytes": int(month_bytes or 0), "day_bytes": int(day_bytes or 0)})
+            st["events"] = events[-60:]
+
+        self.runtime.update({"traffic_rollover": st})
+
     async def meta(self):
         # 允许在未配置 HETZNER_TOKEN 时仍返回基础元信息（版本号等）
         try:
@@ -153,6 +207,15 @@ class MonitorService:
                 return {"id": s["id"], "name": s.get("name", f"server-{s['id']}"), "daily": daily}
 
         result = await asyncio.gather(*[_fetch_one(s) for s in servers]) if servers else []
+
+        rt = self._rollover_totals()
+        hist = rt.get("daily_history") or {}
+        if isinstance(hist, dict) and hist:
+            days_list = sorted(hist.keys())[-int(days):]
+            archived_daily = [{"date": d, "bytes": int(hist.get(d) or 0)} for d in days_list]
+            if any(x.get("bytes", 0) > 0 for x in archived_daily):
+                result.append({"id": "archived", "name": "已删除/重建累计", "daily": archived_daily})
+
         self._daily_cache[cache_key] = result
         self._daily_cache_ts = now_ts
         return result
@@ -509,6 +572,11 @@ class MonitorService:
         net = srv.get("public_net") or {}
         ipv4_id = ((net.get("ipv4") or {}).get("id"))
         ipv6_id = ((net.get("ipv6") or {}).get("id"))
+        month_bytes_snapshot = int(srv.get("outgoing_traffic") or 0)
+        try:
+            day_bytes_snapshot = int(await self.client.get_outbound_today_bytes(server_id, settings.timezone))
+        except Exception:
+            day_bytes_snapshot = 0
 
         kept = {"ipv4": None, "ipv6": None}
         deleted_primary_ips = {"ipv4": None, "ipv6": None}
@@ -562,6 +630,13 @@ class MonitorService:
                 except httpx.HTTPStatusError as e:
                     if not (e.response is not None and e.response.status_code == 404):
                         raise
+
+            # 删除成功后，把该机器当月/当日流量沉淀到历史累计，避免重建/删除后清零统计
+            self._add_rollover(
+                month_bytes=month_bytes_snapshot,
+                day_bytes=day_bytes_snapshot,
+                note=f"delete server#{server_id}",
+            )
         except Exception as e:
             detail = str(e)
             if isinstance(e, httpx.HTTPStatusError) and e.response is not None:
@@ -687,6 +762,11 @@ class MonitorService:
         net = srv.get("public_net") or {}
         ipv4_id = ((net.get("ipv4") or {}).get("id"))
         ipv6_id = ((net.get("ipv6") or {}).get("id"))
+        month_bytes_snapshot = int(srv.get("outgoing_traffic") or 0)
+        try:
+            day_bytes_snapshot = int(await self.client.get_outbound_today_bytes(server_id, settings.timezone))
+        except Exception:
+            day_bytes_snapshot = 0
 
         async def _wait_action_success(action_id: int, title: str):
             for _ in range(90):
@@ -732,6 +812,7 @@ class MonitorService:
 
             # FAST path: direct delete first
             await self.client.delete_server(server_id)
+            self._add_rollover(month_bytes_snapshot, day_bytes_snapshot, note=f"rebuild old server#{server_id}")
             created = await _create_with_retry()
             path = "fast"
         except Exception:
@@ -757,6 +838,7 @@ class MonitorService:
                         if a6:
                             await _wait_action_success(int(a6), f"unassign ipv6#{ipv6_id}")
                     await self.client.delete_server(server_id)
+                    self._add_rollover(month_bytes_snapshot, day_bytes_snapshot, note=f"rebuild old server#{server_id}")
                 except Exception:
                     pass
             try:
@@ -805,6 +887,11 @@ class MonitorService:
             return {"ok": False, "error": "server not found"}
 
         image = int(image_id) if str(image_id).isdigit() else str(image_id)
+        month_bytes_snapshot = int(src.get("outgoing_traffic") or 0)
+        try:
+            day_bytes_snapshot = int(await self.client.get_outbound_today_bytes(server_id, settings.timezone))
+        except Exception:
+            day_bytes_snapshot = 0
         created = await self.client.create_server(
             name=src.get("name", f"server-{server_id}"),
             server_type=src.get("server_type", {}).get("name"),
@@ -812,6 +899,7 @@ class MonitorService:
             image=image,
         )
         await self.client.delete_server(server_id)
+        self._add_rollover(month_bytes_snapshot, day_bytes_snapshot, note=f"full-rebuild old server#{server_id}")
         new_srv = created.get("server", {})
         await self.tg.send(
             f"🧨 完全重建已完成（换IP）\n旧服务器ID: {server_id}\n新服务器ID: {new_srv.get('id')}\n新IP: {new_srv.get('public_net',{}).get('ipv4',{}).get('ip','-')}\n镜像/快照: {image}"
