@@ -31,17 +31,17 @@
 
 ---
 
-## 快速开始（二选一）
+## 快速开始（Docker环境下面二选一）【更加推荐debian环境直接使用下方一键脚本】
 
 > 前提：你的机器已具备 Docker 环境（Docker 或 docker-compose 任一可用）
 
-### 方式 1：一键安装命令（不推荐）
+### 方式 1：一键安装命令（Docker方式1）
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/liqiba/hzc/main/scripts/bootstrap.sh) install
 ```
 
-### 方式 2：直接使用 Compose 配置文件（复制即用）【不推荐】
+### 方式 2：直接使用 Compose 配置文件（复制即用）【Docker Compose方式2】
 
 把下面内容粘贴到你自己的 `docker-compose.yml`：
 
@@ -72,7 +72,7 @@ docker compose up -d --build
 docker-compose up -d --build
 ```
 
-### 一键脚本菜单（推荐）
+### 【debian】一键脚本菜单（极力推荐）
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/liqiba/hzc/main/scripts/bootstrap.sh)
