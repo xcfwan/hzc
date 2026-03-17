@@ -33,6 +33,30 @@
 
 ## 快速开始（3步）
 
+### 0) 用 Docker / Docker Compose 安装本项目
+
+> 前提：你的机器已具备 Docker 环境（Docker 或 docker-compose 任一可用）
+
+**方式A：一条命令（推荐）**
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/liqiba/hzc/main/scripts/bootstrap.sh) install
+```
+
+**方式B：手动 compose 安装**
+
+```bash
+git clone https://github.com/liqiba/hzc.git
+cd hzc
+cp .env.example .env
+cp docker-compose.template.yml docker-compose.yml
+# 编辑 .env，至少填写 HETZNER_TOKEN
+
+# 启动（两种命令二选一）
+docker-compose up -d --build
+# 或
+docker compose up -d --build
+```
 
 ### 1) 一条命令启动（推荐）
 

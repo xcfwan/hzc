@@ -1,0 +1,42 @@
+# HZC docker-compose 安装模板
+# 用法：复制为 docker-compose.yml 后按需修改
+# cp docker-compose.template.yml docker-compose.yml
+
+services:
+  hetzner-traffic-guard:
+    # 方式A：本地构建（默认）
+    build: .
+
+    # 方式B：使用预构建镜像（如需）
+    # image: your-registry/hzc:latest
+
+    container_name: hetzner-traffic-guard
+    restart: unless-stopped
+
+    ports:
+      - "1227:1227"
+
+    env_file:
+      - .env
+
+    # 可选：固定 DNS
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+
+    volumes:
+      # 运行时状态（策略、配置、升级日志）
+      - ./state:/app/state
+
+      # 项目目录挂载到容器，供一键升级脚本读取
+      - ./:/opt/hzc
+
+      # 一键升级需要 Docker Socket（必需）
+      - /var/run/docker.sock:/var/run/docker.sock
+
+    # 可选：资源限制（按需开启）
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: "1.0"
+    #       memory: 512M
