@@ -95,23 +95,47 @@ class TelegramControl:
 
     async def handle(self, text: str, chat_id: str):
         t = (text or "").replace("\ufe0f", "").strip()
+        # 统一压缩空白，兼容客户端按钮文本差异（emoji/空格/变体）
+        t = " ".join(t.split())
+
         quick = {
             "📋 服务器列表": "/list",
             "📊 系统状态": "/status",
             "📈 流量汇总": "/report",
             "🧊 快照列表": "/snapshots",
+            "⚙ qB状态": "/qbstatus",
             "⚙️ qB状态": "/qbstatus",
+            "🏷 版本号": "/version",
             "🏷️ 版本号": "/version",
+            "🛡 安全开关": "/safestatus",
             "🛡️ 安全开关": "/safestatus",
             "🚀 一键升级": "/upgrade",
             "📜 升级日志": "/upgradelog",
             "❓帮助": "/help",
         }
         t = quick.get(t, t)
-        if "一键升级" in t:
+
+        # 模糊兜底：只要包含关键字就转为对应命令，避免“未识别命令”
+        if "服务器列表" in t:
+            t = "/list"
+        elif "系统状态" in t:
+            t = "/status"
+        elif "流量汇总" in t:
+            t = "/report"
+        elif "快照列表" in t:
+            t = "/snapshots"
+        elif "qb状态" in t.lower() or "qB状态" in t:
+            t = "/qbstatus"
+        elif "版本号" in t:
+            t = "/version"
+        elif "安全开关" in t:
+            t = "/safestatus"
+        elif "一键升级" in t:
             t = "/upgrade"
         elif "升级日志" in t:
             t = "/upgradelog"
+        elif "帮助" in t:
+            t = "/help"
         parts = t.split()
         cmd = parts[0].lower() if parts else ""
 
