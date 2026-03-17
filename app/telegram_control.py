@@ -166,10 +166,10 @@ class TelegramControl:
                 "fi; "
                 "if command -v docker-compose >/dev/null 2>&1; then "
                 "  TASK_NAME=hzc-upgrader-$(date +%s); "
-                "  CID=$(docker-compose run -d --rm --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"cd /opt/hzc && timeout 1800 ./scripts/upgrade.sh > /opt/hzc/state/upgrade.log 2>&1\"); "
+                "  CID=$(docker-compose run -d --rm --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"CROOT=''; for d in /opt/hzc /workspace /app /root/hzc .; do if [ -f \\\"$d/scripts/upgrade.sh\\\" ]; then CROOT=\\\"$d\\\"; break; fi; done; [ -n \\\"$CROOT\\\" ] || { echo __CONTAINER_ROOT_NOT_FOUND__; exit 18; }; mkdir -p \\\"$CROOT/state\\\"; cd \\\"$CROOT\\\"; timeout 1800 ./scripts/upgrade.sh > \\\"$CROOT/state/upgrade.log\\\" 2>&1\"); "
                 "elif docker compose version >/dev/null 2>&1; then "
                 "  TASK_NAME=hzc-upgrader-$(date +%s); "
-                "  CID=$(docker compose run -d --rm --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"cd /opt/hzc && timeout 1800 ./scripts/upgrade.sh > /opt/hzc/state/upgrade.log 2>&1\"); "
+                "  CID=$(docker compose run -d --rm --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"CROOT=''; for d in /opt/hzc /workspace /app /root/hzc .; do if [ -f \\\"$d/scripts/upgrade.sh\\\" ]; then CROOT=\\\"$d\\\"; break; fi; done; [ -n \\\"$CROOT\\\" ] || { echo __CONTAINER_ROOT_NOT_FOUND__; exit 18; }; mkdir -p \\\"$CROOT/state\\\"; cd \\\"$CROOT\\\"; timeout 1800 ./scripts/upgrade.sh > \\\"$CROOT/state/upgrade.log\\\" 2>&1\"); "
                 "elif ! command -v docker >/dev/null 2>&1; then echo '__NO_DOCKER__'; exit 17; "
                 "else echo '__NO_COMPOSE__'; exit 13; fi; "
                 "echo $CID"
@@ -189,6 +189,8 @@ class TelegramControl:
                     return await self.send("升级任务触发失败：未检测到 docker compose / docker-compose（已尝试自动安装）", chat_id)
                 if "__NO_DOCKER__" in so:
                     return await self.send("升级任务触发失败：未检测到 docker，无法执行容器升级", chat_id)
+                if "__CONTAINER_ROOT_NOT_FOUND__" in so:
+                    return await self.send("升级任务触发失败：容器内未找到 scripts/upgrade.sh（挂载路径不兼容）", chat_id)
                 if "__FETCH_FAILED__" in so:
                     return await self.send("升级任务触发失败：拉取远端版本信息失败，请稍后重试。", chat_id)
                 if "__ROOT_NOT_FOUND__" in so:
