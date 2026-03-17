@@ -41,20 +41,35 @@
 bash <(curl -fsSL https://raw.githubusercontent.com/liqiba/hzc/main/scripts/bootstrap.sh) install
 ```
 
-### 方式 2：Compose 手动安装（完整命令）
+### 方式 2：直接使用 Compose 配置文件（复制即用）
+
+把下面内容粘贴到你自己的 `docker-compose.yml`：
+
+```yaml
+services:
+  hetzner-traffic-guard:
+    build: .
+    container_name: hetzner-traffic-guard
+    restart: unless-stopped
+    ports:
+      - "1227:1227"
+    env_file:
+      - .env
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    volumes:
+      - ./state:/app/state
+      - ./:/opt/hzc
+      - /var/run/docker.sock:/var/run/docker.sock
+```
+
+然后执行：
 
 ```bash
-git clone https://github.com/liqiba/hzc.git
-cd hzc
-cp .env.example .env
-cp docker-compose.template.yml docker-compose.yml
-
-# 编辑 .env，至少填写 HETZNER_TOKEN
-
-# 启动（docker compose / docker-compose 二选一）
 docker compose up -d --build
 # 或
-# docker-compose up -d --build
+docker-compose up -d --build
 ```
 
 ### 一键脚本菜单（可选）
