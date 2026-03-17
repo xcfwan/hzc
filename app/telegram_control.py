@@ -164,11 +164,11 @@ class TelegramControl:
                 "fi; "
                 "if command -v docker-compose >/dev/null 2>&1; then "
                 "  TASK_NAME=hzc-upgrader-$(date +%s); "
-                "  CID=$(docker-compose run -d --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"if ! command -v docker >/dev/null 2>&1; then apt-get update >/dev/null 2>&1 && apt-get install -y --no-install-recommends docker.io docker-compose >/dev/null 2>&1 || true; fi; command -v docker >/dev/null 2>&1 || { echo __NO_DOCKER_IN_HELPER__; exit 20; }; CROOT=''; for d in /opt/hzc /workspace /app /root/hzc .; do if [ -f \\\"$d/scripts/upgrade.sh\\\" ]; then CROOT=\\\"$d\\\"; break; fi; done; [ -n \\\"$CROOT\\\" ] || { echo __CONTAINER_ROOT_NOT_FOUND__; exit 18; }; mkdir -p \\\"$CROOT/state\\\"; cd \\\"$CROOT\\\"; timeout 1800 ./scripts/upgrade.sh > \\\"$CROOT/state/upgrade.log\\\" 2>&1\") || { echo '__RUN_FAILED__'; exit 19; }; "
+                "  CID=$(docker-compose run -d --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"CROOT=''; for d in /opt/hzc /workspace /app /root/hzc .; do if [ -f \\\"$d/scripts/upgrade.sh\\\" ]; then CROOT=\\\"$d\\\"; break; fi; done; [ -n \\\"$CROOT\\\" ] || { echo __CONTAINER_ROOT_NOT_FOUND__; exit 18; }; mkdir -p \\\"$CROOT/state\\\"; cd \\\"$CROOT\\\"; timeout 1800 ./scripts/upgrade.sh > \\\"$CROOT/state/upgrade.log\\\" 2>&1\") || { echo '__RUN_FAILED__'; exit 19; }; "
                 "  [ -n \"$CID\" ] || { echo '__RUN_FAILED__'; exit 19; }; "
                 "elif docker compose version >/dev/null 2>&1; then "
                 "  TASK_NAME=hzc-upgrader-$(date +%s); "
-                "  CID=$(docker compose run -d --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"if ! command -v docker >/dev/null 2>&1; then apt-get update >/dev/null 2>&1 && apt-get install -y --no-install-recommends docker.io docker-compose >/dev/null 2>&1 || true; fi; command -v docker >/dev/null 2>&1 || { echo __NO_DOCKER_IN_HELPER__; exit 20; }; CROOT=''; for d in /opt/hzc /workspace /app /root/hzc .; do if [ -f \\\"$d/scripts/upgrade.sh\\\" ]; then CROOT=\\\"$d\\\"; break; fi; done; [ -n \\\"$CROOT\\\" ] || { echo __CONTAINER_ROOT_NOT_FOUND__; exit 18; }; mkdir -p \\\"$CROOT/state\\\"; cd \\\"$CROOT\\\"; timeout 1800 ./scripts/upgrade.sh > \\\"$CROOT/state/upgrade.log\\\" 2>&1\") || { echo '__RUN_FAILED__'; exit 19; }; "
+                "  CID=$(docker compose run -d --name $TASK_NAME --no-deps --entrypoint bash hetzner-traffic-guard -lc \"CROOT=''; for d in /opt/hzc /workspace /app /root/hzc .; do if [ -f \\\"$d/scripts/upgrade.sh\\\" ]; then CROOT=\\\"$d\\\"; break; fi; done; [ -n \\\"$CROOT\\\" ] || { echo __CONTAINER_ROOT_NOT_FOUND__; exit 18; }; mkdir -p \\\"$CROOT/state\\\"; cd \\\"$CROOT\\\"; timeout 1800 ./scripts/upgrade.sh > \\\"$CROOT/state/upgrade.log\\\" 2>&1\") || { echo '__RUN_FAILED__'; exit 19; }; "
                 "  [ -n \"$CID\" ] || { echo '__RUN_FAILED__'; exit 19; }; "
                 "elif ! command -v docker >/dev/null 2>&1; then echo '__NO_DOCKER__'; exit 17; "
                 "else echo '__NO_COMPOSE__'; exit 13; fi; "
@@ -193,8 +193,6 @@ class TelegramControl:
                     return await self.send("升级任务触发失败：容器内未找到 scripts/upgrade.sh（挂载路径不兼容）", chat_id)
                 if "__RUN_FAILED__" in so:
                     return await self.send("升级任务触发失败：升级任务容器启动失败（docker/compose执行异常）", chat_id)
-                if "__NO_DOCKER_IN_HELPER__" in so:
-                    return await self.send("升级任务触发失败：升级任务容器内 docker 不可用，已尝试安装仍失败", chat_id)
                 if "__FETCH_FAILED__" in so:
                     return await self.send("升级任务触发失败：拉取远端版本信息失败，请稍后重试。", chat_id)
                 if "__ROOT_NOT_FOUND__" in so:
