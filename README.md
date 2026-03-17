@@ -31,34 +31,33 @@
 
 ---
 
-## 快速开始（3步）
-
-### 0) 用 Docker / Docker Compose 安装本项目
+## 快速开始（二选一）
 
 > 前提：你的机器已具备 Docker 环境（Docker 或 docker-compose 任一可用）
 
-**方式A：一条命令（推荐）**
+### 方式 1：一键安装命令（推荐）
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/liqiba/hzc/main/scripts/bootstrap.sh) install
 ```
 
-**方式B：手动 compose 安装**
+### 方式 2：Compose 手动安装（完整命令）
 
 ```bash
 git clone https://github.com/liqiba/hzc.git
 cd hzc
 cp .env.example .env
 cp docker-compose.template.yml docker-compose.yml
+
 # 编辑 .env，至少填写 HETZNER_TOKEN
 
-# 启动（两种命令二选一）
-docker-compose up -d --build
-# 或
+# 启动（docker compose / docker-compose 二选一）
 docker compose up -d --build
+# 或
+# docker-compose up -d --build
 ```
 
-### 1) 一条命令启动（推荐）
+### 一键脚本菜单（可选）
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/liqiba/hzc/main/scripts/bootstrap.sh)
@@ -73,27 +72,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/liqiba/hzc/main/scripts/boot
 bash <(curl -fsSL https://raw.githubusercontent.com/liqiba/hzc/main/scripts/bootstrap.sh) status
 ```
 
-### 2) 本地脚本方式
-
-```bash
-git clone https://github.com/liqiba/hzc.git
-cd hzc
-chmod +x scripts/onekey.sh
-./scripts/onekey.sh
-```
-
-脚本内置菜单：安装/升级/卸载/状态检查。也可直接子命令：
-
-```bash
-./scripts/onekey.sh install
-./scripts/onekey.sh upgrade
-./scripts/onekey.sh uninstall
-./scripts/onekey.sh status
-```
-
-> 先填 `HETZNER_TOKEN`，其它配置可后续在页面补充。
-
-### 3) 打开面板
+### 打开面板
 
 ```text
 http://你的服务器IP:1227
