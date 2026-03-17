@@ -33,30 +33,28 @@
 
 ## 快速开始（3步）
 
-### 0) 先安装 Docker / Docker Compose（必做）
+### 0) 用 Docker / Docker Compose 安装本项目
 
-> 适用于 Debian / Ubuntu
+> 前提：你的机器已具备 Docker 环境（Docker 或 docker-compose 任一可用）
+
+**方式A：一条命令（推荐）**
 
 ```bash
-apt-get update
-apt-get install -y ca-certificates curl gnupg
-install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/$(. /etc/os-release; echo "$ID")/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-chmod a+r /etc/apt/keyrings/docker.gpg
+bash <(curl -fsSL https://raw.githubusercontent.com/liqiba/hzc/main/scripts/bootstrap.sh) install
+```
 
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$(. /etc/os-release; echo "$ID") \
-  $(. /etc/os-release; echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+**方式B：手动 compose 安装**
 
-apt-get update
-apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+```bash
+git clone https://github.com/liqiba/hzc.git
+cd hzc
+cp .env.example .env
+# 编辑 .env，至少填写 HETZNER_TOKEN
 
-# 兼容旧脚本（可选）
-ln -sf /usr/libexec/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose 2>/dev/null || true
-
-systemctl enable docker --now
-docker --version
-docker compose version
+# 启动（两种命令二选一）
+docker-compose up -d --build
+# 或
+docker compose up -d --build
 ```
 
 ### 1) 一条命令启动（推荐）
