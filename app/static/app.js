@@ -356,10 +356,17 @@ async function loadQBRealtime(){
 
 let __dailyLoaded=false
 async function loadDaily(showToast=false){
-  const r=await fetch('/api/daily_stats?days=7')
-  renderDailyStats(await r.json())
-  __dailyLoaded=true
-  if(showToast) toast('统计已刷新')
+  try{
+    const r=await fetch('/api/daily_stats?days=7')
+    if(!r.ok) throw new Error(`HTTP ${r.status}`)
+    const data=await r.json()
+    renderDailyStats(data)
+    __dailyLoaded=true
+    if(showToast) toast('统计已刷新')
+  }catch(e){
+    // 保留旧内容，避免出现空白
+    if(showToast) toast(`统计刷新失败：${e?.message||e}`)
+  }
 }
 
 function lazyLoadDailyOnce(){
@@ -431,6 +438,7 @@ async function loadAll(showToast=false){
   const tasks=[loadData(false),loadMeta(false),loadQBNodes(),loadAutoPolicies(),loadSafeMode()]
   Promise.allSettled(tasks).then(()=>{
     loadQBRealtime()
+    loadDaily(false)
     lazyLoadDailyOnce()
     if(showToast) toast('全部数据已刷新')
   })
