@@ -6,6 +6,7 @@ let QB_NODES={}
 let AUTO_POLICIES={}
 let __rowHtmlCache={}
 let __qbHtmlCache={}
+let __dailyRenderKey=''
 
 const CACHE_KEYS={
   servers:'hzc.cache.servers',
@@ -44,6 +45,9 @@ function renderDailyStats(items){
   if(!box) return
 
   const arr=Array.isArray(items)?items:[]
+  const key=JSON.stringify(arr)
+  if(key===__dailyRenderKey) return
+  __dailyRenderKey=key
   if(!arr.length){ box.textContent='暂无数据'; return }
 
   try{
@@ -324,11 +328,18 @@ function refreshPrimaryIpOptions(){
 function preset(k){if(k==='basic'){byId('f_cores').value='2';byId('f_mem').value='2';byId('f_family').value='cpx'} if(k==='balanced'){byId('f_cores').value='4';byId('f_mem').value='8';byId('f_family').value='cpx'} if(k==='pro'){byId('f_cores').value='8';byId('f_mem').value='16';byId('f_family').value=''} renderTypeOptions()}
 
 let __loadingData=false
+function applyServerFilter(){
+  const kw=((byId('kw')?.value)||'').trim().toLowerCase()
+  const data=Array.isArray(CURRENT_SERVERS)?CURRENT_SERVERS:[]
+  const f=data.filter(x=>!kw||String(x.name).toLowerCase().includes(kw)||String(x.ip||'').toLowerCase().includes(kw)||String(x.id).includes(kw))
+  patchTableRows(f)
+}
+
 async function loadData(showToast=false){
   if(__loadingData) return
   __loadingData=true
   try{
-    const kw=((byId('kw')?.value)||'').trim().toLowerCase(),r=await fetch('/api/servers')
+    const r=await fetch('/api/servers')
     if(!r.ok) throw new Error(`HTTP ${r.status}`)
     const payload=await r.json();
     const data=Array.isArray(payload)?payload:(payload?.rows||[])
@@ -337,8 +348,7 @@ async function loadData(showToast=false){
     setCache(CACHE_KEYS.servers, data)
     setCache(CACHE_KEYS.ts, Date.now())
     renderCards(data, rollover)
-    const f=data.filter(x=>!kw||String(x.name).toLowerCase().includes(kw)||String(x.ip||'').toLowerCase().includes(kw)||String(x.id).includes(kw))
-    patchTableRows(f)
+    applyServerFilter()
     if(showToast) toast('已刷新')
   }catch(e){
     // 网络波动时保持现有展示，避免出现“空白闪一下”
@@ -825,7 +835,7 @@ async function deleteQBNode(){
   closeQBModal(); loadAll(false)
 }
 
-if(byId('kw')) byId('kw').addEventListener('input',()=>loadData(false))
+if(byId('kw')) byId('kw').addEventListener('input',()=>applyServerFilter())
 initTheme();
 bootstrapFromCache()
 loadAll(false)
