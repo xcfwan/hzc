@@ -315,7 +315,9 @@ async function loadData(showToast=false){
   if(__loadingData) return
   __loadingData=true
   try{
-    const kw=((byId('kw')?.value)||'').trim().toLowerCase(),r=await fetch('/api/servers'),payload=await r.json();
+    const kw=((byId('kw')?.value)||'').trim().toLowerCase(),r=await fetch('/api/servers')
+    if(!r.ok) throw new Error(`HTTP ${r.status}`)
+    const payload=await r.json();
     const data=Array.isArray(payload)?payload:(payload?.rows||[])
     const rollover=Array.isArray(payload)?{}:(payload?.rollover||{})
     CURRENT_SERVERS=data
@@ -325,6 +327,9 @@ async function loadData(showToast=false){
     const f=data.filter(x=>!kw||String(x.name).toLowerCase().includes(kw)||String(x.ip||'').toLowerCase().includes(kw)||String(x.id).includes(kw))
     patchTableRows(f)
     if(showToast) toast('已刷新')
+  }catch(e){
+    // 网络波动时保持现有展示，避免出现“空白闪一下”
+    if(showToast) toast(`刷新失败：${e?.message||e}`)
   } finally { __loadingData=false }
 }
 

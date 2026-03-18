@@ -28,6 +28,9 @@ class MonitorService:
         self._daily_cache = {}
         self._daily_cache_ts = 0.0
         self._daily_cache_ttl = 30.0
+        self._today_cache = {}
+        self._today_cache_ts = {}
+        self._today_cache_ttl = 120.0
 
     def _rollover_state(self):
         rc = self.runtime.get()
@@ -236,9 +239,14 @@ class MonitorService:
             qb_tasks[str(sid)] = asyncio.create_task(QBClient.fetch_stats(node.get("url", ""), node.get("username", ""), node.get("password", "")))
 
         # parallelize today-bytes metrics to reduce end-to-end latency
+        # + timeout/cache fallback to avoid occasional blank/zero flashes
+        now_ts = dt.datetime.utcnow().timestamp()
         today_tasks = {}
         for s in servers:
-            sid = s["id"]
+            sid = int(s["id"])
+            last_ts = float(self._today_cache_ts.get(sid) or 0)
+            if (now_ts - last_ts) < self._today_cache_ttl and sid in self._today_cache:
+                continue
             today_tasks[sid] = asyncio.create_task(self.client.get_outbound_today_bytes(sid, settings.timezone))
 
         for s in servers:
@@ -248,10 +256,16 @@ class MonitorService:
             used_gb = outbound / (1024**3)
             included_tb = (int(s.get("included_traffic") or 0) / BYTES_IN_TB) or settings.traffic_limit_tb
             pct = used_tb / included_tb if included_tb > 0 else 0
-            try:
-                today_bytes = await today_tasks[s["id"]]
-            except Exception:
-                today_bytes = 0
+            sid = int(s["id"])
+            if sid in today_tasks:
+                try:
+                    today_bytes = await asyncio.wait_for(today_tasks[sid], timeout=12)
+                    self._today_cache[sid] = int(today_bytes or 0)
+                    self._today_cache_ts[sid] = now_ts
+                except Exception:
+                    today_bytes = int(self._today_cache.get(sid, 0) or 0)
+            else:
+                today_bytes = int(self._today_cache.get(sid, 0) or 0)
             today_gb = (today_bytes / (1024**3)) if today_bytes else 0.0
             qbs = {"enabled": False}
             t = qb_tasks.get(str(s["id"]))
