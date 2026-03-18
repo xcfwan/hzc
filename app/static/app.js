@@ -41,28 +41,41 @@ function renderCards(data, rollover={}){
 
 function renderDailyStats(items){
   const box=byId('dailyStats')
-  if(!items?.length){box.textContent='暂无数据';return}
-  DAILY_MAP={}
-  box.innerHTML=items.map(s=>{
-    const daily=(s.daily||[])
-    DAILY_MAP[s.id]=daily
-    const gb=daily.map(x=>x.bytes/1024/1024/1024)
-    const max=Math.max(...gb,1)
-    const avg=gb.length?gb.reduce((a,b)=>a+b,0)/gb.length:0
-    const today=gb.length?gb[gb.length-1]:0
-    const ratio=avg>0?today/avg:1
-    const level=ratio>=2?'crit':(ratio>=1.5?'warn':'ok')
-    const bars=daily.slice(-7).map(d=>{
-      const v=d.bytes/1024/1024/1024
-      const h=Math.max(3,Math.round(v/max*28))
-      const cls=v>=avg*2?'crit':(v>=avg*1.5?'hot':'')
-      const md=(d.date||'').slice(5)
-      const tip=`${md}: ${v.toFixed(2)} GB`
-      return `<i class='${cls}' style='height:${h}px' data-tip='${tip.replace(/'/g,"&#39;")}'></i>`
+  if(!box) return
+
+  const arr=Array.isArray(items)?items:[]
+  if(!arr.length){ box.textContent='暂无数据'; return }
+
+  try{
+    DAILY_MAP={}
+    const hasAnyPoints=arr.some(s=>Array.isArray(s?.daily) && s.daily.length>0)
+    box.innerHTML=arr.map(s=>{
+      const daily=Array.isArray(s?.daily)?s.daily:[]
+      DAILY_MAP[s.id]=daily
+      const gb=daily.map(x=>Number(x?.bytes||0)/1024/1024/1024)
+      const max=Math.max(...gb,1)
+      const avg=gb.length?gb.reduce((a,b)=>a+b,0)/gb.length:0
+      const today=gb.length?gb[gb.length-1]:0
+      const ratio=avg>0?today/avg:1
+      const level=ratio>=2?'crit':(ratio>=1.5?'warn':'ok')
+      const bars=daily.slice(-7).map(d=>{
+        const v=Number(d?.bytes||0)/1024/1024/1024
+        const h=Math.max(3,Math.round(v/max*28))
+        const cls=v>=avg*2?'crit':(v>=avg*1.5?'hot':'')
+        const md=String(d?.date||'').slice(5)
+        const tip=`${md}: ${v.toFixed(2)} GB`
+        return `<i class='${cls}' style='height:${h}px' data-tip='${tip.replace(/'/g,"&#39;")}'></i>`
+      }).join('')
+      const badge=level==='ok'?'':`<span class='badge-traffic ${level==='crit'?'badge-crit':'badge-warn'}'>${level==='crit'?'流量较高':'流量偏高'}</span>`
+      return `<div class="daily-item"><b>${s?.name||s?.id||'unknown'}</b>${badge}<div class="spark">${bars||'<span class="daily-mini">无最近数据</span>'}</div></div>`
     }).join('')
-    const badge=level==='ok'?'':`<span class='badge-traffic ${level==='crit'?'badge-crit':'badge-warn'}'>${level==='crit'?'流量较高':'流量偏高'}</span>`
-    return `<div class="daily-item"><b>${s.name}</b>${badge}<div class="spark">${bars||'<span class="daily-mini">无最近数据</span>'}</div></div>`
-  }).join('')
+
+    if(!hasAnyPoints){
+      box.insertAdjacentHTML('beforeend', `<div class="daily-item"><span class="daily-mini">提示：当前时间窗口暂无可绘制流量点</span></div>`)
+    }
+  }catch(e){
+    box.textContent='统计渲染失败，请刷新重试'
+  }
 }
 
 function formatIEC(bytes){
