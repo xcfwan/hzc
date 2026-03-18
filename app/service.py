@@ -580,6 +580,7 @@ class MonitorService:
 
         kept = {"ipv4": None, "ipv6": None}
         deleted_primary_ips = {"ipv4": None, "ipv6": None}
+        warnings = []
 
         try:
             # 需要保留IP时，先禁止级联删除，避免删机把IP一起删掉
@@ -615,21 +616,39 @@ class MonitorService:
 
             await self.client.delete_server(server_id)
 
-            # 未勾选保留IP时删除Primary IP（若已被级联删除/不存在则忽略404）
+            # 未勾选保留IP时删除Primary IP（删除失败不阻断“服务器删除成功”）
+            async def _delete_primary_with_retry(pid: int, label: str):
+                last = None
+                for i in range(4):
+                    try:
+                        await self.client.delete_primary_ip(int(pid))
+                        return True
+                    except httpx.HTTPStatusError as e:
+                        last = e
+                        code = e.response.status_code if e.response is not None else None
+                        # 404: 已删除；412/422: 资源状态切换中，稍后重试
+                        if code == 404:
+                            return True
+                        if code in (412, 422):
+                            await asyncio.sleep(2 + i * 2)
+                            continue
+                        raise
+                if last is not None:
+                    try:
+                        body = last.response.text if last.response is not None else str(last)
+                    except Exception:
+                        body = str(last)
+                    warnings.append(f"{label} delete failed: {body[:200]}")
+                return False
+
             if (not keep_ipv4) and ipv4_id:
-                try:
-                    await self.client.delete_primary_ip(int(ipv4_id))
+                ok4 = await _delete_primary_with_retry(int(ipv4_id), f"ipv4#{ipv4_id}")
+                if ok4:
                     deleted_primary_ips["ipv4"] = int(ipv4_id)
-                except httpx.HTTPStatusError as e:
-                    if not (e.response is not None and e.response.status_code == 404):
-                        raise
             if (not keep_ipv6) and ipv6_id:
-                try:
-                    await self.client.delete_primary_ip(int(ipv6_id))
+                ok6 = await _delete_primary_with_retry(int(ipv6_id), f"ipv6#{ipv6_id}")
+                if ok6:
                     deleted_primary_ips["ipv6"] = int(ipv6_id)
-                except httpx.HTTPStatusError as e:
-                    if not (e.response is not None and e.response.status_code == 404):
-                        raise
 
             # 删除成功后，把该机器当月/当日流量沉淀到历史累计，避免重建/删除后清零统计
             self._add_rollover(
@@ -646,7 +665,7 @@ class MonitorService:
                     detail = str(e)
             return {"ok": False, "error": detail}
 
-        await self.tg.send(
+        msg = (
             f"🗑️ 服务器已删除\nID: {server_id}\n名称: {srv.get('name','-')}\n"
             f"快照: {'已创建' if create_snapshot else '未创建'}{f' ({snapshot_name})' if snapshot_name else ''}\n"
             f"模式: {keep_mode}\n"
@@ -655,6 +674,9 @@ class MonitorService:
             f"已删除Primary IPv4: {'是' if bool(deleted_primary_ips['ipv4']) else '否'}\n"
             f"已删除Primary IPv6: {'是' if bool(deleted_primary_ips['ipv6']) else '否'}"
         )
+        if warnings:
+            msg += "\n⚠️ 警告: " + " | ".join(warnings)
+        await self.tg.send(msg)
         return {
             "ok": True,
             "deleted_server_id": server_id,
@@ -663,6 +685,7 @@ class MonitorService:
             "keep_mode": keep_mode,
             "kept_primary_ip_ids": kept,
             "deleted_primary_ip_ids": deleted_primary_ips,
+            "warnings": warnings,
         }
 
     async def delete_snapshot_manual(self, image_id: int):
