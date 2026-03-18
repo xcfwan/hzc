@@ -178,27 +178,59 @@ function patchTableRows(rows){
   const oldMap={}
   Array.from(tbody.querySelectorAll('tr[data-id]')).forEach(tr=>{ oldMap[tr.getAttribute('data-id')] = tr })
 
-  const frag=document.createDocumentFragment()
   const newCache={}
+  const total=rows.length
 
-  for(const r of rows){
-    const id=String(r.id)
-    const html=rowHtml(r)
-    newCache[id]=html
-    const oldTr=oldMap[id]
-
-    if(oldTr && __rowHtmlCache[id]===html){
-      frag.appendChild(oldTr)
-    }else{
-      const tmp=document.createElement('tbody')
-      tmp.innerHTML=html
-      frag.appendChild(tmp.firstElementChild)
+  // 小数据量直接渲染，大数据量分帧渲染，避免主线程长时间阻塞
+  if(total <= 30){
+    const frag=document.createDocumentFragment()
+    for(const r of rows){
+      const id=String(r.id)
+      const html=rowHtml(r)
+      newCache[id]=html
+      const oldTr=oldMap[id]
+      if(oldTr && __rowHtmlCache[id]===html){
+        frag.appendChild(oldTr)
+      }else{
+        const tmp=document.createElement('tbody')
+        tmp.innerHTML=html
+        frag.appendChild(tmp.firstElementChild)
+      }
     }
+    tbody.innerHTML=''
+    tbody.appendChild(frag)
+    __rowHtmlCache=newCache
+    return
   }
 
   tbody.innerHTML=''
-  tbody.appendChild(frag)
-  __rowHtmlCache=newCache
+  const batch=20
+  let i=0
+  const step=()=>{
+    const frag=document.createDocumentFragment()
+    const end=Math.min(i+batch,total)
+    for(; i<end; i++){
+      const r=rows[i]
+      const id=String(r.id)
+      const html=rowHtml(r)
+      newCache[id]=html
+      const oldTr=oldMap[id]
+      if(oldTr && __rowHtmlCache[id]===html){
+        frag.appendChild(oldTr)
+      }else{
+        const tmp=document.createElement('tbody')
+        tmp.innerHTML=html
+        frag.appendChild(tmp.firstElementChild)
+      }
+    }
+    tbody.appendChild(frag)
+    if(i<total){
+      requestAnimationFrame(step)
+    }else{
+      __rowHtmlCache=newCache
+    }
+  }
+  requestAnimationFrame(step)
 }
 
 async function copyText(v){
