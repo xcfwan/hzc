@@ -489,7 +489,25 @@ function bootstrapFromCache(){
 }
 
 async function loadAll(showToast=false){
-  // 非阻塞刷新：页面先显示缓存，再后台并行刷新
+  // v1 秒开：先走聚合快照接口，快速首屏
+  try{
+    const r=await fetch('/api/dashboard_fast')
+    if(r.ok){
+      const p=await r.json()
+      const rows=Array.isArray(p?.rows)?p.rows:[]
+      const rollover=p?.rollover||{}
+      if(rows.length){
+        CURRENT_SERVERS=rows
+        renderCards(rows, rollover)
+        applyServerFilter()
+      }
+      if(byId('appVersion') && p?.app_version){
+        byId('appVersion').textContent=p.app_version
+      }
+    }
+  }catch(e){}
+
+  // 非阻塞补全：后台并行拉完整数据
   const tasks=[loadData(false),loadMeta(false),loadQBNodes(),loadAutoPolicies(),loadSafeMode()]
   Promise.allSettled(tasks).then(()=>{
     loadQBRealtime()

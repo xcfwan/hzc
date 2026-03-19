@@ -31,6 +31,9 @@ class MonitorService:
         self._today_cache = {}
         self._today_cache_ts = {}
         self._today_cache_ttl = 120.0
+        self._fast_cache = None
+        self._fast_cache_ts = 0.0
+        self._fast_cache_ttl = 3.0
 
     def _rollover_state(self):
         rc = self.runtime.get()
@@ -222,6 +225,23 @@ class MonitorService:
         self._daily_cache[cache_key] = result
         self._daily_cache_ts = now_ts
         return result
+
+    async def dashboard_fast(self):
+        now_ts = dt.datetime.utcnow().timestamp()
+        if self._fast_cache and (now_ts - self._fast_cache_ts) < self._fast_cache_ttl:
+            return self._fast_cache
+
+        rows = await self.collect(use_cache=True)
+        payload = {
+            "rows": rows,
+            "rollover": self._rollover_totals(),
+            "app_version": settings.app_version,
+            "app_commit": settings.app_commit,
+            "ts": int(now_ts),
+        }
+        self._fast_cache = payload
+        self._fast_cache_ts = now_ts
+        return payload
 
     async def collect(self, use_cache: bool = True):
         if use_cache:

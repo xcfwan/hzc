@@ -137,6 +137,13 @@ async def home(request: Request):
     })
 
 
+@app.get('/api/dashboard_fast')
+async def dashboard_fast():
+    if not settings.hetzner_token:
+        raise HTTPException(status_code=500, detail='HETZNER_TOKEN missing')
+    return await monitor.dashboard_fast()
+
+
 @app.get('/api/servers')
 async def servers():
     if not settings.hetzner_token:
