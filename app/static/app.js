@@ -11,6 +11,7 @@ let __dailyRenderKey=''
 const CACHE_KEYS={
   servers:'hzc.cache.servers',
   meta:'hzc.cache.meta',
+  daily:'hzc.cache.daily',
   ts:'hzc.cache.ts'
 }
 
@@ -415,6 +416,7 @@ async function loadDaily(showToast=false){
     const r=await fetch('/api/daily_stats?days=7')
     if(!r.ok) throw new Error(`HTTP ${r.status}`)
     const data=await r.json()
+    setCache(CACHE_KEYS.daily, {data, ts: Date.now()})
     renderDailyStats(data)
     __dailyLoaded=true
     if(showToast) toast('统计已刷新')
@@ -477,6 +479,7 @@ async function toggleSafeMode(){
 function bootstrapFromCache(){
   const cachedServers=getCache(CACHE_KEYS.servers)
   const cachedMeta=getCache(CACHE_KEYS.meta)
+  const cachedDailyWrap=getCache(CACHE_KEYS.daily)
   if(cachedMeta){
     META=cachedMeta
     if(byId('appVersion')) byId('appVersion').textContent = META.app_version || '--'
@@ -485,6 +488,13 @@ function bootstrapFromCache(){
     CURRENT_SERVERS=cachedServers
     renderCards(cachedServers)
     patchTableRows(cachedServers)
+  }
+
+  // 秒开：优先渲染本地缓存的每日统计
+  const cachedDaily = Array.isArray(cachedDailyWrap?.data) ? cachedDailyWrap.data : null
+  if(cachedDaily && cachedDaily.length){
+    renderDailyStats(cachedDaily)
+    __dailyLoaded = true
   }
 }
 
