@@ -244,6 +244,8 @@ async def api_upgrade():
         "if [ -z \"$ROOT\" ]; then echo '__ROOT_NOT_FOUND__'; exit 15; fi; "
         "mkdir -p \"$ROOT/state\"; cd \"$ROOT\"; "
         "git fetch origin main >/dev/null 2>&1 || { echo '__FETCH_FAILED__'; exit 14; }; "
+        "LOCAL=$(git rev-parse HEAD 2>/dev/null || true); REMOTE=$(git rev-parse origin/main 2>/dev/null || true); "
+        "if [ -n \"$LOCAL\" ] && [ \"$LOCAL\" = \"$REMOTE\" ]; then echo '__UPGRADE_UPTODATE__'; exit 11; fi; "
         "if ! command -v docker-compose >/dev/null 2>&1 && ! docker compose version >/dev/null 2>&1; then "
         "  if command -v docker >/dev/null 2>&1 && command -v apt-get >/dev/null 2>&1; then "
         "    apt-get update >/dev/null 2>&1 && apt-get install -y --no-install-recommends docker-compose-plugin docker-compose >/dev/null 2>&1 || true; "
