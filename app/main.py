@@ -8,6 +8,7 @@ from pydantic import BaseModel
 import asyncio
 import uuid
 import time
+import datetime as dt
 
 from app.config import settings
 from app.service import monitor
@@ -110,7 +111,17 @@ class AutoPolicyReq(BaseModel):
 @app.on_event('startup')
 async def startup_event():
     if settings.hetzner_token:
-        scheduler.add_job(monitor.rotate_if_needed, 'interval', minutes=settings.check_interval_minutes, id='check-traffic', replace_existing=True)
+        scheduler.add_job(
+            monitor.rotate_if_needed,
+            'interval',
+            minutes=settings.check_interval_minutes,
+            id='check-traffic',
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            next_run_time=dt.datetime.utcnow(),
+            misfire_grace_time=300,
+        )
         scheduler.start()
     if tg_control.enabled:
         import asyncio
