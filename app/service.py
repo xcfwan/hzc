@@ -58,6 +58,32 @@ class MonitorService:
             "daily_history": st.get("daily_history") or {},
         }
 
+    def _merge_rollover_daily_history(self, daily_points: list[dict], exclude_today: bool = True):
+        st = self._rollover_state()
+        hist = st.get("daily_history") or {}
+        if not isinstance(hist, dict):
+            hist = {}
+
+        today = dt.datetime.utcnow().date().isoformat()
+        for p in (daily_points or []):
+            d = str(p.get("date") or "")
+            if not d:
+                continue
+            if exclude_today and d == today:
+                continue
+            try:
+                b = int(p.get("bytes") or 0)
+            except Exception:
+                b = 0
+            if b <= 0:
+                continue
+            hist[d] = int(hist.get(d) or 0) + b
+
+        for k in sorted(list(hist.keys()))[:-35]:
+            hist.pop(k, None)
+        st["daily_history"] = hist
+        self.runtime.update({"traffic_rollover": st})
+
     def _add_rollover(self, month_bytes: int, day_bytes: int, note: str = ""):
         st = self._rollover_state()
         today = dt.datetime.utcnow().date().isoformat()
@@ -635,6 +661,14 @@ class MonitorService:
             day_bytes_snapshot = int(await self.client.get_outbound_today_bytes(server_id, settings.timezone))
         except Exception:
             day_bytes_snapshot = 0
+        try:
+            daily_points_snapshot = await self.client.get_outbound_daily(server_id, days=30)
+        except Exception:
+            daily_points_snapshot = []
+        try:
+            daily_points_snapshot = await self.client.get_outbound_daily(server_id, days=30)
+        except Exception:
+            daily_points_snapshot = []
 
         kept = {"ipv4": None, "ipv6": None}
         deleted_primary_ips = {"ipv4": None, "ipv6": None}
@@ -714,6 +748,7 @@ class MonitorService:
                 day_bytes=day_bytes_snapshot,
                 note=f"delete server#{server_id}",
             )
+            self._merge_rollover_daily_history(daily_points_snapshot, exclude_today=True)
         except Exception as e:
             detail = str(e)
             if isinstance(e, httpx.HTTPStatusError) and e.response is not None:
@@ -961,6 +996,7 @@ class MonitorService:
             # FAST path: direct delete first
             await self.client.delete_server(server_id)
             self._add_rollover(month_bytes_snapshot, day_bytes_snapshot, note=f"rebuild old server#{server_id}")
+            self._merge_rollover_daily_history(daily_points_snapshot, exclude_today=True)
             created = await _create_with_retry()
             path = "fast"
         except Exception:
@@ -987,6 +1023,7 @@ class MonitorService:
                             await _wait_action_success(int(a6), f"unassign ipv6#{ipv6_id}")
                     await self.client.delete_server(server_id)
                     self._add_rollover(month_bytes_snapshot, day_bytes_snapshot, note=f"rebuild old server#{server_id}")
+                    self._merge_rollover_daily_history(daily_points_snapshot, exclude_today=True)
                 except Exception:
                     pass
             try:
@@ -1055,6 +1092,10 @@ class MonitorService:
             day_bytes_snapshot = int(await self.client.get_outbound_today_bytes(server_id, settings.timezone))
         except Exception:
             day_bytes_snapshot = 0
+        try:
+            daily_points_snapshot = await self.client.get_outbound_daily(server_id, days=30)
+        except Exception:
+            daily_points_snapshot = []
         created = await self.client.create_server(
             name=src.get("name", f"server-{server_id}"),
             server_type=src.get("server_type", {}).get("name"),
@@ -1063,6 +1104,7 @@ class MonitorService:
         )
         await self.client.delete_server(server_id)
         self._add_rollover(month_bytes_snapshot, day_bytes_snapshot, note=f"full-rebuild old server#{server_id}")
+        self._merge_rollover_daily_history(daily_points_snapshot, exclude_today=True)
         new_srv = created.get("server", {})
         await self.tg.send(
             f"🧨 完全重建已完成（换IP）\n旧服务器ID: {server_id}\n新服务器ID: {new_srv.get('id')}\n新IP: {new_srv.get('public_net',{}).get('ipv4',{}).get('ip','-')}\n镜像/快照: {image}"

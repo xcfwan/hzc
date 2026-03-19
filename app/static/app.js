@@ -63,7 +63,7 @@ function renderDailyStats(items){
       const today=gb.length?gb[gb.length-1]:0
       const ratio=avg>0?today/avg:1
       const level=ratio>=2?'crit':(ratio>=1.5?'warn':'ok')
-      const bars=daily.slice(-7).map(d=>{
+      const bars=daily.slice(-30).map(d=>{
         const v=Number(d?.bytes||0)/1024/1024/1024
         const h=Math.max(3,Math.round(v/max*28))
         const cls=v>=avg*2?'crit':(v>=avg*1.5?'hot':'')
@@ -413,7 +413,7 @@ async function loadQBRealtime(){
 let __dailyLoaded=false
 async function loadDaily(showToast=false){
   try{
-    const r=await fetch('/api/daily_stats?days=7')
+    const r=await fetch('/api/daily_stats?days=30')
     if(!r.ok) throw new Error(`HTTP ${r.status}`)
     const data=await r.json()
     setCache(CACHE_KEYS.daily, {data, ts: Date.now()})
