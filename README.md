@@ -31,7 +31,9 @@
 
 ---
 
-## 快速开始（Docker环境下面二选一）【更加推荐debian环境直接使用下方一键脚本】
+## 快速开始【推荐方式3】
+
+###（Docker环境下面二选一）【更加推荐debian环境直接使用下方一键脚本】
 
 > 前提：你的机器已具备 Docker 环境（Docker 或 docker-compose 任一可用）
 
@@ -72,7 +74,7 @@ docker compose up -d --build
 docker-compose up -d --build
 ```
 
-### 【debian】一键脚本菜单（极力推荐）
+##  方式3 【debian】一键脚本菜单（极力推荐）
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/liqiba/hzc/main/scripts/bootstrap.sh)
