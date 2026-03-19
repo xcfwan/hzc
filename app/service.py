@@ -833,7 +833,27 @@ class MonitorService:
     async def _post_rebuild_qb_check(self, old_server_id: int, new_server_id: int, node: dict | None):
         if not node:
             return
-        await asyncio.sleep(120)  # give server/qB service time to come up
+
+        # 先等新服务器进入 running，再检查 qB
+        running = False
+        for _ in range(48):  # up to ~8 min (10s interval)
+            try:
+                srv = await self.client.get_server(new_server_id)
+                if (srv or {}).get("status") == "running":
+                    running = True
+                    break
+            except Exception:
+                pass
+            await asyncio.sleep(10)
+
+        if not running:
+            await self.tg.send(
+                f"⚠️ 重建后 qB 检查跳过：新服务器长时间未到 running\n旧ID: {old_server_id}\n新ID: {new_server_id}"
+            )
+            return
+
+        # running 后再给 qB 一点启动缓冲
+        await asyncio.sleep(25)
         try:
             stats = await QBClient.fetch_stats(node.get("url", ""), node.get("username", ""), node.get("password", ""))
             ok = bool((stats or {}).get("enabled")) and not (stats or {}).get("error")
