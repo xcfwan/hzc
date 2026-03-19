@@ -322,14 +322,38 @@ class MonitorService:
         if not isinstance(guard_state, dict):
             guard_state = {}
 
+        # 对“启用自动重建”的机器，使用 metrics 月累计做一次实时校准，避免 list_servers 的月流量滞后
+        realtime_used_tb = {}
+        enabled_rows = [r for r in rows if bool((r.get("auto_policy") or {}).get("enabled", False))]
+        if enabled_rows:
+            sem = asyncio.Semaphore(5)
+
+            async def _calc_used_tb(r):
+                sid = int(r.get("id"))
+                limit_tb = float(r.get("limit_tb", 20) or 20)
+                try:
+                    async with sem:
+                        b = await asyncio.wait_for(self.client.get_outbound_bytes_month(sid), timeout=20)
+                    return sid, (b / BYTES_IN_TB), limit_tb
+                except Exception:
+                    # 失败回退到 collect 的值
+                    return sid, float(r.get("used_tb", 0) or 0), limit_tb
+
+            vals = await asyncio.gather(*[_calc_used_tb(r) for r in enabled_rows])
+            for sid, used_tb, _limit_tb in vals:
+                realtime_used_tb[int(sid)] = {"used_tb": float(used_tb)}
+
         for row in rows:
             sid = str(row.get("id"))
             pol = row.get("auto_policy") or {}
             enabled = bool(pol.get("enabled", False))
             threshold = float(pol.get("threshold", settings.rotate_threshold))
             used_tb = float(row.get("used_tb", 0) or 0)
-            over = bool(row.get("over_threshold", False))
             limit_tb = float(row.get("limit_tb", 20) or 20)
+            rt = realtime_used_tb.get(int(row.get("id") or 0))
+            if rt:
+                used_tb = float(rt.get("used_tb", used_tb))
+            over = bool(limit_tb > 0 and (used_tb / limit_tb) >= threshold)
 
             st = guard_state.get(sid) or {}
             if not isinstance(st, dict):
