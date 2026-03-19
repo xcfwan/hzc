@@ -779,6 +779,53 @@ class MonitorService:
             "poweron_action": (on or {}).get("action", on),
         }
 
+    def _migrate_policy_and_qb(self, old_server_id: int, new_server_id: int):
+        # Carry over auto rebuild policy + qB node config when server ID changes after rebuild
+        migrated_policy = False
+        qb_node = None
+
+        try:
+            policies = self.auto_policy.all() or {}
+            old_key = str(old_server_id)
+            if old_key in policies:
+                self.auto_policy.set(new_server_id, policies.get(old_key) or {})
+                self.auto_policy.delete(old_server_id)
+                migrated_policy = True
+        except Exception:
+            pass
+
+        try:
+            nodes = self.qb_store.get_all() or {}
+            old_key = str(old_server_id)
+            if old_key in nodes:
+                qb_node = nodes.get(old_key) or {}
+                self.qb_store.set(new_server_id, qb_node)
+                self.qb_store.delete(old_server_id)
+        except Exception:
+            pass
+
+        return {"migrated_policy": migrated_policy, "qb_node": qb_node}
+
+    async def _post_rebuild_qb_check(self, old_server_id: int, new_server_id: int, node: dict | None):
+        if not node:
+            return
+        await asyncio.sleep(120)  # give server/qB service time to come up
+        try:
+            stats = await QBClient.fetch_stats(node.get("url", ""), node.get("username", ""), node.get("password", ""))
+            ok = bool((stats or {}).get("enabled")) and not (stats or {}).get("error")
+            if ok:
+                await self.tg.send(
+                    f"✅ 重建后 qB 配置已延用并通过检查\n旧ID: {old_server_id}\n新ID: {new_server_id}\nURL: {node.get('url','-')}"
+                )
+            else:
+                await self.tg.send(
+                    f"⚠️ 重建后 qB 配置已延用，但检查未通过\n旧ID: {old_server_id}\n新ID: {new_server_id}\nURL: {node.get('url','-')}"
+                )
+        except Exception as e:
+            await self.tg.send(
+                f"⚠️ 重建后 qB 延时检查失败\n旧ID: {old_server_id}\n新ID: {new_server_id}\n错误: {str(e)[:300]}"
+            )
+
     async def rebuild_with_snapshot_manual(self, server_id: int, image_id):
         # Fast-first rebuild strategy:
         # 1) direct delete old server (expect Primary IP to become unassigned)
@@ -894,6 +941,17 @@ class MonitorService:
                 return {"ok": False, "server_id": server_id, "image_id": image, "error": detail}
 
         new_srv = created.get("server", {})
+        new_id = new_srv.get("id")
+
+        carried_qb = None
+        migrated_policy = False
+        if new_id:
+            mig = self._migrate_policy_and_qb(server_id, int(new_id))
+            migrated_policy = bool((mig or {}).get("migrated_policy"))
+            carried_qb = (mig or {}).get("qb_node")
+            if carried_qb:
+                asyncio.create_task(self._post_rebuild_qb_check(server_id, int(new_id), carried_qb))
+
         await self.tg.send(
             f"♻️ 重建已完成（重置流量）\n"
             f"旧服务器ID: {server_id}\n"
@@ -901,6 +959,8 @@ class MonitorService:
             f"IPv4: {new_srv.get('public_net',{}).get('ipv4',{}).get('ip','-')}\n"
             f"镜像/快照: {image}\n"
             f"路径: {path}\n"
+            f"策略迁移: {'已延用' if migrated_policy else '无/未延用'}\n"
+            f"qB迁移: {'已延用' if carried_qb else '无/未延用'}\n"
             f"说明: 已删除旧机，并使用原Primary IP创建同配置新机"
         )
 
@@ -910,6 +970,8 @@ class MonitorService:
             "new_server": new_srv,
             "image_id": image,
             "path": path,
+            "migrated_auto_policy": migrated_policy,
+            "migrated_qb": bool(carried_qb),
             "kept_primary_ip_ids": {
                 "ipv4": int(ipv4_id) if ipv4_id else None,
                 "ipv6": int(ipv6_id) if ipv6_id else None,
