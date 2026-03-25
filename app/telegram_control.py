@@ -162,9 +162,26 @@ class TelegramControl:
             return await self.send(f"服务器: {len(rows)} 台\n超阈值: {warn} 台\nSAFE_MODE: {settings.safe_mode}", chat_id)
 
         if cmd == "/report":
-            rows = await self.monitor.collect()
-            total = sum(r.get("used_tb", 0) for r in rows)
-            return await self.send(f"本月总出流量: {total:.2f} TB", chat_id)
+            payload = await self.monitor.dashboard_fast()
+            rows = payload.get("rows") or []
+            rollover = payload.get("rollover") or {}
+
+            live_total_tb = sum(float(r.get("used_tb", 0) or 0) for r in rows)
+            rollover_month_tb = float((int(rollover.get("month_bytes") or 0)) / (1024**4))
+            total_tb = live_total_tb + rollover_month_tb
+
+            live_today_gb = sum(float(r.get("today_gb", 0) or 0) for r in rows)
+            rollover_day_gb = float((int(rollover.get("day_bytes") or 0)) / (1024**3))
+            today_gb = live_today_gb + rollover_day_gb
+
+            return await self.send(
+                f"📈 流量汇总\n"
+                f"本月总出流量: {total_tb:.2f} TB\n"
+                f"- 现存服务器: {live_total_tb:.2f} TB\n"
+                f"- 已删/重建累计: {rollover_month_tb:.2f} TB\n"
+                f"今日合计: {today_gb:.2f} GB",
+                chat_id,
+            )
 
         if cmd == "/version":
             return await self.send(f"当前版本: {settings.app_version}\n提交: {settings.app_commit}", chat_id)
