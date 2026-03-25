@@ -560,7 +560,62 @@ class MonitorService:
         await self.tg.send(f"⚠️ 服务器 {server_id} 已触发重置密码，但未在响应中拿到明文密码，请到 Hetzner Console 查看 Action 结果。")
         return {"ok": True, "server_id": server_id, "new_password": None, "note": "password not returned by api response"}
 
+    async def _fetch_live_type_quote(self, server_type: str, location: str):
+        quote = {
+            "checked": False,
+            "server_type": server_type,
+            "location": location,
+            "sellable": None,
+            "monthly_gross_eur": None,
+            "currency": "EUR",
+        }
+        try:
+            types = await self.client.list_server_types()
+            quote["checked"] = True
+        except Exception as e:
+            quote["error"] = f"list_server_types failed: {str(e)[:240]}"
+            return quote
+
+        target = next((t for t in (types or []) if isinstance(t, dict) and t.get("name") == server_type), None)
+        if not target:
+            quote["sellable"] = False
+            quote["error"] = "server_type not found from live api"
+            return quote
+
+        prices = [p for p in (target.get("prices") or []) if isinstance(p, dict)]
+        sellable_locations = [p.get("location") for p in prices if p.get("location")]
+        quote["sellable_locations"] = sellable_locations
+
+        price_row = next((p for p in prices if p.get("location") == location), None)
+        quote["sellable"] = bool(price_row)
+        if price_row:
+            pm = (price_row.get("price_monthly") or {})
+            try:
+                quote["monthly_gross_eur"] = float(pm.get("gross")) if pm.get("gross") is not None else None
+            except Exception:
+                quote["monthly_gross_eur"] = None
+            if pm.get("currency"):
+                quote["currency"] = str(pm.get("currency"))
+
+        return quote
+
     async def create_server_manual(self, name: str, server_type: str, location: str, image, primary_ip_id: int | None = None, primary_ipv6_id: int | None = None):
+        live_quote = await self._fetch_live_type_quote(server_type, location)
+        if live_quote.get("checked") and live_quote.get("sellable") is False:
+            return {
+                "ok": False,
+                "error": f"机型 {server_type} 在机房 {location} 当前 API 不可售，请刷新后重试或更换机型/机房",
+                "live_quote": live_quote,
+                "request": {
+                    "name": name,
+                    "server_type": server_type,
+                    "location": location,
+                    "image": image,
+                    "primary_ip_id": primary_ip_id,
+                    "primary_ipv6_id": primary_ipv6_id,
+                },
+            }
+
         created = None
         try:
             # placement 波动下先按原参数重试几次
@@ -602,6 +657,7 @@ class MonitorService:
             return {
                 "ok": False,
                 "error": detail,
+                "live_quote": live_quote,
                 "request": {
                     "name": name,
                     "server_type": server_type,
@@ -612,10 +668,13 @@ class MonitorService:
                 },
             }
 
+        created["live_quote"] = live_quote
         srv = created.get("server", {})
         sid = srv.get("id")
         sname = srv.get("name", name)
-        await self.tg.send(f"🆕 New server created: {sname} (ID: {sid})")
+        fee = live_quote.get("monthly_gross_eur")
+        fee_txt = f"\n参考月费: €{fee:.2f}" if isinstance(fee, (int, float)) else ""
+        await self.tg.send(f"🆕 New server created: {sname} (ID: {sid}){fee_txt}")
 
         # Try directly from create response, fallback to reset-password workflow.
         pwd = self._extract_password(created)

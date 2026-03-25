@@ -731,19 +731,43 @@ async function submitCreate(){
   if(!location){ alert('请选择机房'); return }
   if(!image){ alert('请选择镜像/快照'); return }
 
-  const body={
-    name,
-    server_type:serverType,
-    location,
-    image,
-    primary_ip_id: (v4 && v4!=='__none__') ? Number(v4) : null,
-    primary_ipv6_id: (v6 && v6!=='__none__') ? Number(v6) : null
-  }
-
   CREATING_SERVER = true
-  if(btn){ btn.disabled=true; btn.textContent='创建中...' }
+  if(btn){ btn.disabled=true; btn.textContent='校验库存/价格中...' }
 
   try{
+    // 创建前实时拉取一次官方机型价格与可售性，避免使用旧缓存
+    const pre=await fetch('/api/meta')
+    const latest=await pre.json()
+    if(!pre.ok){
+      alert(latest?.detail||latest?.error||`创建前校验失败（HTTP ${pre.status}）`)
+      return
+    }
+    META = latest
+    setCache(CACHE_KEYS.meta, META)
+    setCache(CACHE_KEYS.ts, Date.now())
+
+    const latestType=(META.server_types||[]).find(t=>t.name===serverType)
+    if(!latestType){
+      alert(`创建前校验失败：最新API未找到机型 ${serverType}，请刷新后重试`)
+      return
+    }
+    const sellable=(latestType.sellable_locations||[]).includes(location)
+    if(!sellable){
+      alert(`创建前校验失败：${serverType} 在 ${location} 当前API显示不可售，请更换机型或机房`)
+      showTypePrice()
+      return
+    }
+
+    const body={
+      name,
+      server_type:serverType,
+      location,
+      image,
+      primary_ip_id: (v4 && v4!=='__none__') ? Number(v4) : null,
+      primary_ipv6_id: (v6 && v6!=='__none__') ? Number(v6) : null
+    }
+
+    if(btn){ btn.disabled=true; btn.textContent='创建中...' }
     const r=await fetch('/api/create_server',{
       method:'POST',
       headers:{'content-type':'application/json'},
