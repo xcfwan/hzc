@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_URL="https://github.com/liqiba/hzc.git"
+REPO_URL="https://github.com/xcfwan/hzc.git"
 TARGET_DIR="${HZC_DIR:-/opt/hzc}"
 BRANCH="${HZC_BRANCH:-main}"
 ACTION="${1:-menu}"
