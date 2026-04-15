@@ -40,7 +40,7 @@
 ### 方式 1：一键安装命令（Docker方式1）
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/liqiba/hzc/main/scripts/bootstrap.sh) install
+bash <(curl -fsSL https://raw.githubusercontent.com/xcfwan/hzc/main/scripts/bootstrap.sh) install
 ```
 
 ### 方式 2：直接使用 Compose 配置文件（复制即用）【Docker Compose方式2】
@@ -77,16 +77,16 @@ docker-compose up -d --build
 ##  方式3 【debian】一键脚本菜单（极力推荐）
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/liqiba/hzc/main/scripts/bootstrap.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/xcfwan/hzc/main/scripts/bootstrap.sh)
 ```
 
 可直接指定动作：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/liqiba/hzc/main/scripts/bootstrap.sh) install
-bash <(curl -fsSL https://raw.githubusercontent.com/liqiba/hzc/main/scripts/bootstrap.sh) upgrade
-bash <(curl -fsSL https://raw.githubusercontent.com/liqiba/hzc/main/scripts/bootstrap.sh) uninstall
-bash <(curl -fsSL https://raw.githubusercontent.com/liqiba/hzc/main/scripts/bootstrap.sh) status
+bash <(curl -fsSL https://raw.githubusercontent.com/xcfwan/hzc/main/scripts/bootstrap.sh) install
+bash <(curl -fsSL https://raw.githubusercontent.com/xcfwan/hzc/main/scripts/bootstrap.sh) upgrade
+bash <(curl -fsSL https://raw.githubusercontent.com/xcfwan/hzc/main/scripts/bootstrap.sh) uninstall
+bash <(curl -fsSL https://raw.githubusercontent.com/xcfwan/hzc/main/scripts/bootstrap.sh) status
 ```
 
 ### 打开面板
