@@ -944,45 +944,81 @@ class MonitorService:
 
         return {"migrated_policy": migrated_policy, "qb_node": qb_node}
 
-    async def _post_rebuild_qb_check(self, old_server_id: int, new_server_id: int, node: dict | None):
-        if not node:
-            return
+   async def _post_rebuild_qb_check(self, old_server_id: int, new_server_id: int, node: dict | None):
+    if not node:
+        return
 
-        # 先等新服务器进入 running，再检查 qB
-        running = False
-        for _ in range(48):  # up to ~8 min (10s interval)
-            try:
-                srv = await self.client.get_server(new_server_id)
-                if (srv or {}).get("status") == "running":
-                    running = True
-                    break
-            except Exception:
-                pass
-            await asyncio.sleep(10)
+    url = (node.get("url") or "").strip()
+    username = node.get("username", "")
+    password = node.get("password", "")
 
-        if not running:
-            await self.tg.send(
-                f"⚠️ 重建后 qB 检查跳过：新服务器长时间未到 running\n旧ID: {old_server_id}\n新ID: {new_server_id}"
-            )
-            return
+    if not (url and username and password):
+        await self.tg.send(
+            f"⚠️ 重建后 qB 配置不完整，无法自动重连\n"
+            f"旧ID: {old_server_id}\n"
+            f"新ID: {new_server_id}"
+        )
+        return
 
-        # running 后再给 qB 一点启动缓冲
-        await asyncio.sleep(25)
+    # 先等新服务器进入 running
+    running = False
+    for _ in range(48):  # 最多等约 8 分钟
         try:
-            stats = await QBClient.fetch_stats(node.get("url", ""), node.get("username", ""), node.get("password", ""))
+            srv = await self.client.get_server(new_server_id)
+            if (srv or {}).get("status") == "running":
+                running = True
+                break
+        except Exception:
+            pass
+        await asyncio.sleep(10)
+
+    if not running:
+        await self.tg.send(
+            f"⚠️ 重建后 qB 自动重连未启动：新服务器长时间未到 running\n"
+            f"旧ID: {old_server_id}\n"
+            f"新ID: {new_server_id}"
+        )
+        return
+
+    # running 后给 qB 一点启动时间
+    await asyncio.sleep(25)
+
+    attempt = 0
+    last_error = ""
+
+    while True:
+        attempt += 1
+        try:
+            stats = await QBClient.fetch_stats(url, username, password)
             ok = bool((stats or {}).get("enabled")) and not (stats or {}).get("error")
+
             if ok:
                 await self.tg.send(
-                    f"✅ 重建后 qB 配置已延用并通过检查\n旧ID: {old_server_id}\n新ID: {new_server_id}\nURL: {node.get('url','-')}"
+                    f"✅ 重建后 qB 已自动重连成功\n"
+                    f"旧ID: {old_server_id}\n"
+                    f"新ID: {new_server_id}\n"
+                    f"URL: {url}\n"
+                    f"检查次数: {attempt}"
                 )
-            else:
-                await self.tg.send(
-                    f"⚠️ 重建后 qB 配置已延用，但检查未通过\n旧ID: {old_server_id}\n新ID: {new_server_id}\nURL: {node.get('url','-')}"
-                )
+                return
+
+            last_error = str((stats or {}).get("error") or "qB not ready")
+
         except Exception as e:
+            last_error = str(e)[:300]
+
+        # 第一次失败提醒一次，之后每 12 次（约 1 小时）提醒一次，避免 TG 被刷屏
+        if attempt == 1 or attempt % 12 == 0:
             await self.tg.send(
-                f"⚠️ 重建后 qB 延时检查失败\n旧ID: {old_server_id}\n新ID: {new_server_id}\n错误: {str(e)[:300]}"
+                f"⚠️ 重建后 qB 尚未连通，5 分钟后继续重试\n"
+                f"旧ID: {old_server_id}\n"
+                f"新ID: {new_server_id}\n"
+                f"URL: {url}\n"
+                f"第 {attempt} 次检查失败\n"
+                f"错误: {last_error}"
             )
+
+        await asyncio.sleep(300)  # 5 分钟
 
     async def rebuild_with_snapshot_manual(self, server_id: int, image_id):
         # Fast-first rebuild strategy:
